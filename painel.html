@@ -16,7 +16,7 @@
   body { font-family: 'Montserrat', sans-serif; background-color: var(--fundo-bege); color: var(--texto-escuro); line-height: 1.6; }
   h1, h2, h3 { font-family: 'Playfair Display', serif; color: var(--roxo-escuro); }
 
-  /* LOGIN */
+  /* TELA DE LOGIN */
   #tela-login { height: 100vh; display: flex; justify-content: center; align-items: center; background: linear-gradient(135deg, #3b2e45 0%, #2a282b 100%); }
   .login-box { background: var(--branco); padding: 40px 30px; border-radius: 20px; box-shadow: 0 20px 50px rgba(0,0,0,0.3); text-align: center; max-width: 400px; width: 90%; }
   .login-box h1 { margin-bottom: 10px; font-size: 2rem; }
@@ -25,6 +25,7 @@
   .login-box input:focus { border-color: var(--verde-salvia); }
   .btn-login { width: 100%; background: var(--verde-salvia); color: var(--branco); border: none; padding: 15px; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: 0.3s; }
   .btn-login:hover { background: var(--verde-escuro); }
+  #erroLogin { color: var(--perigo); margin-top: 15px; font-size: 0.9rem; font-weight: bold; display: none; }
 
   /* SISTEMA */
   #sistema { display: none; min-height: 100vh; }
@@ -53,11 +54,9 @@
   .form-control { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-family: 'Montserrat', sans-serif; font-size: 0.95rem; outline: none; transition: 0.3s; background-color: #fff; }
   .form-control:focus { border-color: var(--verde-salvia); box-shadow: 0 0 0 3px rgba(111,143,122,0.1); }
   textarea.form-control { resize: vertical; min-height: 120px; }
-  
   .row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
   .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
   .row-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 20px; align-items: end;}
-  .row-cpf { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; margin-bottom: 15px;}
 
   .btn { background: var(--verde-salvia); color: var(--branco); border: none; padding: 12px 25px; border-radius: 8px; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: 0.3s; display: inline-flex; align-items: center; gap: 8px; }
   .btn:hover { background: var(--verde-escuro); transform: translateY(-2px); }
@@ -94,7 +93,7 @@
   @media (max-width: 900px) {
     .sidebar { width: 100%; height: auto; position: relative; padding: 20px; flex-direction: row; flex-wrap: wrap; justify-content: center; }
     .main-content { margin-left: 0; padding: 20px; }
-    .row, .row-3, .row-4, .row-cpf { grid-template-columns: 1fr; }
+    .row, .row-3, .row-4 { grid-template-columns: 1fr; }
     .btn-sair { margin-top: 10px; }
     .header-relatorio-container { flex-direction: column; text-align: center; gap: 10px; }
     .header-titulo { text-align: center; }
@@ -130,7 +129,7 @@
       <input type="email" id="emailInput" placeholder="E-mail de acesso">
       <input type="password" id="senhaInput" placeholder="Senha de acesso" onkeydown="if(event.key==='Enter') fazerLogin()">
       <button class="btn-login" onclick="fazerLogin()">Entrar no Painel</button>
-      <p id="erroLogin" style="color: var(--perigo); margin-top: 15px; display: none;">E-mail ou senha incorretos.</p>
+      <p id="erroLogin"></p>
     </div>
   </div>
 
@@ -162,12 +161,12 @@
             <div class="form-group"><label>Data de Nascimento</label><input type="text" id="pNasc" class="form-control" placeholder="Clique para abrir o calendário"><small id="infoIdade" style="color: var(--verde-salvia); font-weight: 600; display: none; margin-top: 5px;"></small></div>
           </div>
           
-          <div class="row-cpf">
+          <div class="row" style="margin-bottom: 15px;">
             <div class="form-group"><label>CPF do Paciente (opcional)</label><input type="text" id="pCpf" class="form-control" placeholder="000.000.000-00"></div>
             <div class="form-group"><label>Nome do Responsável</label><input type="text" id="pResp" class="form-control" placeholder="Ex: Maria Silva"></div>
           </div>
 
-          <div class="row-cpf">
+          <div class="row" style="margin-bottom: 15px;">
             <div class="form-group"><label>CPF do Responsável (opcional)</label><input type="text" id="pCpfResp" class="form-control" placeholder="000.000.000-00"></div>
             <div class="form-group"><label>Telefone de Contato</label><input type="text" id="pTel" class="form-control" placeholder="(31) 99999-9999"></div>
           </div>
@@ -287,6 +286,7 @@
     import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
     
+    // Carrega o Flatpickr dinamicamente para não travar a página
     const scriptFlatpickr = document.createElement('script');
     scriptFlatpickr.src = "https://cdn.jsdelivr.net/npm/flatpickr";
     document.head.appendChild(scriptFlatpickr);
@@ -314,14 +314,21 @@
     let evolucoesGlobal = [];
     let configCalendario = {};
 
+    // Torna a função de login global para o botão conseguir chamar
     window.fazerLogin = async function() {
       const email = document.getElementById('emailInput').value;
       const senha = document.getElementById('senhaInput').value;
+      const erroP = document.getElementById('erroLogin');
+      
+      if(!email || !senha) { erroP.innerText = "Preencha e-mail e senha."; erroP.style.display = 'block'; return; }
+      
       try {
         await signInWithEmailAndPassword(auth, email, senha);
-        document.getElementById('erroLogin').style.display = 'none';
+        erroP.style.display = 'none';
       } catch (error) {
-        document.getElementById('erroLogin').style.display = 'block';
+        console.error(error);
+        erroP.innerText = "Erro ao entrar: " + error.message;
+        erroP.style.display = 'block';
       }
     };
 
@@ -465,4 +472,251 @@
     window.excluirPaciente = async function(id) {
       if (!confirm('Tem certeza? Isso apagará o cadastro, mas não apagará os atendimentos já registrados.')) return;
       try { await deleteDoc(doc(db, "pacientes", id)); await carregarDados(); } 
-      catch(e) { alert("Erro ao excluir: " +
+      catch(e) { alert("Erro ao excluir: " + e.message); }
+    };
+
+    window.salvarAgenda = async function() {
+      const pacienteId = document.getElementById('aPaciente').value;
+      const data = document.getElementById('aData').value;
+      const hora = document.getElementById('aHora').value;
+      const tipo = document.getElementById('aTipo').value.trim();
+      if (!pacienteId || !data || !hora) { alert('Preencha todos os campos obrigatórios.'); return; }
+
+      const paciente = pacientesGlobal.find(p => p.id === pacienteId);
+
+      try {
+        await addDoc(collection(db, "agenda"), { pacienteId, pacienteNome: paciente.nome, data, hora, tipo });
+        document.getElementById('aData').value = '';
+        if (document.getElementById('aData')._flatpickr) document.getElementById('aData')._flatpickr.clear();
+        document.getElementById('aHora').value = '';
+        document.getElementById('aTipo').value = '';
+        await carregarDados();
+      } catch(e) { alert("Erro ao agendar: " + e.message); }
+    };
+
+    window.excluirAgenda = async function(id) {
+      if (!confirm('Cancelar este agendamento?')) return;
+      try { await deleteDoc(doc(db, "agenda", id)); await carregarDados(); } 
+      catch(e) { alert(e.message); }
+    };
+
+    window.salvarEvolucao = async function() {
+      const idEdicao = document.getElementById('eIdEdicao').value;
+      const pacienteId = document.getElementById('ePaciente').value;
+      const data = document.getElementById('eData').value;
+      const descricao = document.getElementById('eDescricao').value.trim();
+      const descricaoIA = document.getElementById('iaTexto').innerText.trim();
+
+      if (!pacienteId || !data || !descricao) { alert('Preencha paciente, data e descrição.'); return; }
+
+      const paciente = pacientesGlobal.find(p => p.id === pacienteId);
+
+      try {
+        if (idEdicao) {
+          await updateDoc(doc(db, "evolucoes", idEdicao), { pacienteId, pacienteNome: paciente.nome, data, descricao, descricaoIA });
+        } else {
+          await addDoc(collection(db, "evolucoes"), { pacienteId, pacienteNome: paciente.nome, data, descricao, descricaoIA });
+        }
+        window.cancelarEdicaoEvolucao();
+        alert('Evolução salva com sucesso!');
+        await carregarDados();
+      } catch(e) { alert("Erro: " + e.message); }
+    };
+
+    window.editarEvolucao = function(id) {
+      const e = evolucoesGlobal.find(e => e.id === id);
+      if (!e) return;
+      document.getElementById('eIdEdicao').value = e.id;
+      document.getElementById('ePaciente').value = e.pacienteId;
+      document.getElementById('eData').value = e.data;
+      if (document.getElementById('eData')._flatpickr) document.getElementById('eData')._flatpickr.setDate(e.data, false);
+      document.getElementById('eDescricao').value = e.descricao;
+      
+      if (e.descricaoIA) {
+        document.getElementById('iaTexto').innerText = e.descricaoIA;
+        document.getElementById('iaResultado').classList.add('visivel');
+      } else {
+        document.getElementById('iaResultado').classList.remove('visivel');
+      }
+      
+      document.getElementById('tituloFormEvolucao').innerText = "Editar Evolução de Atendimento";
+      document.getElementById('btnSalvarEvolucao').innerText = "Atualizar Evolução";
+      document.getElementById('btnCancelarEvolucao').style.display = "inline-block";
+      window.scrollTo({ top: 0, behavior: 'smooth' });
+    };
+
+    window.cancelarEdicaoEvolucao = function() {
+      document.getElementById('eIdEdicao').value = '';
+      document.getElementById('ePaciente').value = '';
+      document.getElementById('eData').value = '';
+      if (document.getElementById('eData')._flatpickr) document.getElementById('eData')._flatpickr.clear();
+      document.getElementById('eDescricao').value = '';
+      document.getElementById('iaResultado').classList.remove('visivel');
+      document.getElementById('iaTexto').innerText = '';
+
+      document.getElementById('tituloFormEvolucao').innerText = "Registrar Evolução de Atendimento";
+      document.getElementById('btnSalvarEvolucao').innerText = "Salvar no Prontuário";
+      document.getElementById('btnCancelarEvolucao').style.display = "none";
+    };
+
+    window.gerarIA = function() {
+      const textoOriginal = document.getElementById('eDescricao').value.trim();
+      if (!textoOriginal) { alert('Escreva a descrição do atendimento primeiro.'); return; }
+
+      document.getElementById('iaTexto').innerText = "Analisando relato, corrigindo português e estruturando prontuário clínico...";
+      document.getElementById('iaResultado').classList.add('visivel');
+
+      setTimeout(() => {
+        let t = textoOriginal;
+        const correcoes = [
+          { de: /\bnao\b/gi, para: "não" }, { de: /\bvoce\b/gi, para: "você" },
+          { de: /\btambem\b/gi, para: "também" }, { de: /\bagente\b/gi, para: "a gente" },
+          { de: /\bpobrema\b/gi, para: "problema" }, { de: /\bmenas\b/gi, para: "menos" },
+          { de: /\bconcerteza\b/gi, para: "com certeza" }, { de: /\bderrepente\b/gi, para: "de repente" },
+          { de: /\bexcessao\b/gi, para: "exceção" }, { de: /\bexelente\b/gi, para: "excelente" },
+          { de: /\bapos\b/gi, para: "após" }, { de: /\bja\b/gi, para: "já" },
+          { de: /\bso\b/gi, para: "só" }, { de: /\bate\b/gi, para: "até" },
+          { de: /brincamos/gi, para: "Foram propostas atividades lúdicas direcionadas a" },
+          { de: /trabalhamos/gi, para: "A intervenção foi focada em" },
+          { de: /ele ficou agitado/gi, para: "O paciente apresentou agitação psicomotora inicial" },
+          { de: /ela ficou agitada/gi, para: "A paciente apresentou agitação psicomotora inicial" },
+          { de: /melhorou/gi, para: "demonstrou evolução positiva no processo de regulação" },
+          { de: /equilíbrio/gi, para: "controle postural e equilíbrio dinâmico" },
+          { de: /balanço/gi, para: "equipamentos suspensos (estímulo vestibular)" },
+          { de: /massinha/gi, para: "massa de modelar (estímulo tátil e proprioceptivo)" },
+          { de: /texturas/gi, para: "exploração tátil de diferentes texturas" },
+          { de: /piscina de bolinhas/gi, para: "piscina de bolinhas (estímulo proprioceptivo por compressão)" },
+          { de: /pulou/gi, para: "realizou saltos (praxia global)" },
+          { de: /rolou/gi, para: "executou rolamentos (praxia global)" },
+          { de: /focou/gi, para: "sustentou a atenção por períodos mais longos" },
+          { de: /não quis/gi, para: "apresentou resistência inicial à proposta" },
+          { de: /gostou/gi, para: "aderiu positivamente à atividade" },
+          { de: /correu/gi, para: "vivenciou experiências de deslocamento e velocidade" },
+          { de: /circuito/gi, para: "circuito motor sequencial" },
+        ];
+        correcoes.forEach(c => { t = t.replace(c.de, c.para); });
+        t = t.replace(/\s+/g, ' ').trim();
+        t = t.replace(/([.!?]\s+)([a-zà-ú])/g, (match, p1, p2) => p1 + p2.toUpperCase());
+        if (t.length > 0) t = t.charAt(0).toUpperCase() + t.slice(1);
+
+        const textoFinal = 
+          `**RELATO DE EVOLUÇÃO - TERAPIA OCUPACIONAL**\n` +
+          `**Enfoque:** Integração Sensorial e Desenvolvimento Infantil\n\n` +
+          `**1. Perfil da Sessão e Acolhimento:**\n` +
+          `O atendimento foi conduzido considerando as demandas sensoriais e motoras da criança. ` +
+          `${t}\n\n` +
+          `**2. Objetivos e Conduta Terapêutica:**\n` +
+          `A intervenção estruturou-se a partir das atividades descritas, as quais atuaram como ferramentas para o aprimoramento do processamento sensorial, da modulação e/ou do planejamento motor (praxia). O ambiente terapêutico (sala sensorial) mostrou-se adequado para a expressão das respostas adaptativas esperadas.\n\n` +
+          `**3. Análise Clínica e Desempenho Ocupacional:**\n` +
+          `A partir da resposta da criança às propostas, observou-se engajamento nas tarefas e oportunidades de ganho em autorregulação e consciência corporal. Recomenda-se a continuidade do plano terapêutico, mantendo o foco na generalização das habilidades sensório-motoras adquiridas para o cotidiano familiar e escolar.`;
+
+        document.getElementById('iaTexto').innerText = textoFinal;
+      }, 1500);
+    };
+
+    function carregarSelects() {
+      let options = '<option value="">Selecione um paciente</option>';
+      pacientesGlobal.forEach(p => { options += `<option value="${p.id}">${p.nome}</option>`; });
+      
+      document.getElementById('aPaciente').innerHTML = options;
+      document.getElementById('ePaciente').innerHTML = options;
+      
+      let filtroOptions = '<option value="">Todos os Pacientes</option>';
+      pacientesGlobal.forEach(p => { filtroOptions += `<option value="${p.id}">${p.nome}</option>`; });
+      document.getElementById('fPaciente').innerHTML = filtroOptions;
+    }
+
+    function renderizarTudo() {
+      document.getElementById('listaPacientes').innerHTML = pacientesGlobal.map(p => {
+        const idade = window.calcularIdade(p.nasc);
+        return `
+        <tr>
+          <td><strong>${p.nome}</strong></td>
+          <td>${p.nasc || '-'}</td>
+          <td style="font-weight:600; color:var(--verde-escuro);">${idade || '-'}</td>
+          <td>${p.resp || '-'}</td>
+          <td>${p.tel || '-'}</td>
+          <td>
+            <button class="btn btn-editar" style="padding:5px 10px; font-size:0.8rem; margin-right:5px;" onclick="editarPaciente('${p.id}')">Editar</button>
+            <button class="btn btn-perigo" style="padding:5px 10px; font-size:0.8rem;" onclick="excluirPaciente('${p.id}')">Excluir</button>
+          </td>
+        </tr>
+      `}).join('') || '<tr><td colspan="6">Nenhum paciente cadastrado.</td></tr>';
+
+      agendaGlobal.sort((a, b) => {
+        const dateA = a.data.split('/').reverse().join('');
+        const dateB = b.data.split('/').reverse().join('');
+        return (dateA + a.hora).localeCompare(dateB + b.hora);
+      });
+      document.getElementById('listaAgenda').innerHTML = agendaGlobal.map(a => `
+        <tr>
+          <td>${a.data}</td>
+          <td>${a.hora}</td>
+          <td>${a.pacienteNome}</td>
+          <td>${a.tipo || '-'}</td>
+          <td><button class="btn btn-perigo" style="padding:5px 10px; font-size:0.8rem;" onclick="excluirAgenda('${a.id}')">Cancelar</button></td>
+        </tr>
+      `).join('') || '<tr><td colspan="5">Nenhum agendamento futuro.</td></tr>';
+
+      const evosRecentes = [...evolucoesGlobal].reverse().slice(0, 10);
+      document.getElementById('listaEvolucao').innerHTML = evosRecentes.map(e => `
+        <tr>
+          <td>${e.data}</td>
+          <td>${e.pacienteNome}</td>
+          <td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${e.descricao}">${e.descricao}</td>
+          <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color:var(--verde-escuro);" title="${e.descricaoIA}">${e.descricaoIA ? 'Ver prontuário estruturado' : 'Não gerado'}</td>
+          <td><button class="btn btn-editar" style="padding:5px 10px; font-size:0.8rem;" onclick="editarEvolucao('${e.id}')">Editar</button></td>
+        </tr>
+      `).join('') || '<tr><td colspan="5">Nenhum atendimento registrado.</td></tr>';
+      
+      window.filtrarRelatorio(); 
+    }
+
+    window.filtrarRelatorio = function() {
+      let evolucoes = [...evolucoesGlobal];
+      
+      const fPac = document.getElementById('fPaciente').value;
+      const fDataExata = document.getElementById('fData').value;
+      const fDataIni = document.getElementById('fDataInicio').value;
+      const fDataFim = document.getElementById('fDataFim').value;
+
+      if (fPac) { evolucoes = evolucoes.filter(e => e.pacienteId === fPac); }
+      
+      const parseDate = (d) => {
+        if(!d) return null;
+        const p = d.split('/');
+        return new Date(p[2], p[1]-1, p[0]);
+      };
+
+      const dtExata = parseDate(fDataExata);
+      const dtIni = parseDate(fDataIni);
+      const dtFim = parseDate(fDataFim);
+
+      if (dtExata) {
+        evolucoes = evolucoes.filter(e => parseDate(e.data).getTime() === dtExata.getTime());
+      } else {
+        if (dtIni) { evolucoes = evolucoes.filter(e => parseDate(e.data) >= dtIni); }
+        if (dtFim) { evolucoes = evolucoes.filter(e => parseDate(e.data) <= dtFim); }
+      }
+
+      evolucoes.sort((a,b) => parseDate(b.data) - parseDate(a.data));
+
+      document.getElementById('listaRelatorios').innerHTML = evolucoes.map(e => `
+        <tr>
+          <td style="white-space: nowrap; vertical-align: top;">${e.data}</td>
+          <td style="white-space: nowrap; vertical-align: top;"><strong>${e.pacienteNome}</strong></td>
+          <td style="font-size: 0.85rem; line-height: 1.5;">${(e.descricaoIA || e.descricao).replace(/\n/g, '<br>')}</td>
+        </tr>
+      `).join('') || '<tr><td colspan="3">Nenhum atendimento encontrado.</td></tr>';
+    };
+
+    window.limparFiltros = function() {
+      document.getElementById('fPaciente').value = '';
+      if(document.getElementById('fData')._flatpickr) document.getElementById('fData')._flatpickr.clear();
+      if(document.getElementById('fDataInicio')._flatpickr) document.getElementById('fDataInicio')._flatpickr.clear();
+      if(document.getElementById('fDataFim')._flatpickr) document.getElementById('fDataFim')._flatpickr.clear();
+      window.filtrarRelatorio();
+    };
+  </script>
+</body>
+</html>
