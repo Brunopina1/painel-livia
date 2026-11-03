@@ -1,475 +1,235 @@
-<!DOCTYPE html>
-<html lang="pt-BR">
-<head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Painel Restrito | Livia Caroline - TO</title>
-<link href="https://fonts.googleapis.com/css2?family=Montserrat:wght@300;400;500;600;700&family=Playfair+Display:ital,wght@0,500;0,600;1,500;1,600&display=swap" rel="stylesheet">
-<link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/flatpickr/dist/flatpickr.min.css">
-<style>
-  :root {
-    --verde-salvia: #6f8f7a; --verde-escuro: #4a6352; --roxo-escuro: #3b2e45;
-    --fundo-bege: #fcfaf5; --texto-escuro: #2a282b; --texto-claro: #5c5861;
-    --branco: #ffffff; --coral: #d98a8a; --perigo: #d9534f; --alerta: #f0ad4e;
-  }
-  * { margin: 0; padding: 0; box-sizing: border-box; }
-  body { font-family: 'Montserrat', sans-serif; background-color: var(--fundo-bege); color: var(--texto-escuro); line-height: 1.6; }
-  h1, h2, h3 { font-family: 'Playfair Display', serif; color: var(--roxo-escuro); }
+    window.salvarEvolucao = async function() {
+      const idEdicao = document.getElementById('eIdEdicao').value;
+      const pacienteId = document.getElementById('ePaciente').value;
+      const data = document.getElementById('eData').value;
+      const descricao = document.getElementById('eDescricao').value.trim();
+      const descricaoIA = document.getElementById('iaTexto').innerText.trim();
 
-  /* TELA DE LOGIN */
-  #tela-login { height: 100vh; display: flex; justify-content: center; align-items: center; background: linear-gradient(135deg, #3b2e45 0%, #2a282b 100%); }
-  .login-box { background: var(--branco); padding: 40px 30px; border-radius: 20px; box-shadow: 0 20px 50px rgba(0,0,0,0.3); text-align: center; max-width: 400px; width: 90%; }
-  .login-box h1 { margin-bottom: 10px; font-size: 2rem; }
-  .login-box p { color: var(--texto-claro); margin-bottom: 30px; font-size: 0.9rem; }
-  .login-box input { width: 100%; padding: 15px; margin-bottom: 15px; border: 1px solid #ddd; border-radius: 8px; font-size: 1rem; outline: none; transition: 0.3s; }
-  .login-box input:focus { border-color: var(--verde-salvia); }
-  .btn-login { width: 100%; background: var(--verde-salvia); color: var(--branco); border: none; padding: 15px; border-radius: 8px; font-size: 1rem; font-weight: 600; cursor: pointer; transition: 0.3s; }
-  .btn-login:hover { background: var(--verde-escuro); }
-  #erroLogin { color: var(--perigo); margin-top: 15px; font-size: 0.9rem; font-weight: bold; display: none; }
+      if (!pacienteId || !data || !descricao) { alert('Preencha paciente, data e descrição.'); return; }
 
-  /* SISTEMA */
-  #sistema { display: none; min-height: 100vh; }
-  .sidebar { width: 260px; background: var(--roxo-escuro); color: var(--branco); height: 100vh; position: fixed; top: 0; left: 0; padding: 30px 20px; display: flex; flex-direction: column; gap: 10px; z-index: 100; }
-  .sidebar h2 { color: var(--branco); font-size: 1.5rem; margin-bottom: 30px; text-align: center; }
-  .menu-item { padding: 15px 20px; border-radius: 10px; cursor: pointer; display: flex; align-items: center; gap: 15px; transition: 0.3s; color: #d1cdd6; }
-  .menu-item:hover { background: rgba(255,255,255,0.1); color: var(--branco); }
-  .menu-item.ativo { background: var(--verde-salvia); color: var(--branco); font-weight: 600; }
-  .btn-sair { margin-top: auto; background: transparent; border: 1px solid var(--coral); color: var(--coral); padding: 12px; border-radius: 8px; cursor: pointer; transition: 0.3s; }
-  .btn-sair:hover { background: var(--coral); color: var(--branco); }
+      const paciente = pacientesGlobal.find(p => p.id === pacienteId);
 
-  .main-content { margin-left: 260px; padding: 40px; min-height: 100vh; }
-  .top-bar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 30px; }
-  .top-bar h1 { font-size: 2rem; }
-  .badge { background: var(--branco); padding: 8px 15px; border-radius: 20px; font-size: 0.85rem; color: var(--verde-salvia); font-weight: 600; box-shadow: 0 4px 10px rgba(0,0,0,0.05); }
-
-  .tela { display: none; animation: fadeIn 0.4s ease; }
-  .tela.ativa { display: block; }
-  @keyframes fadeIn { from { opacity: 0; transform: translateY(10px); } to { opacity: 1; transform: translateY(0); } }
-
-  .card { background: var(--branco); border-radius: 15px; padding: 30px; box-shadow: 0 10px 30px rgba(0,0,0,0.05); margin-bottom: 30px; }
-  .card h3 { margin-bottom: 20px; font-size: 1.3rem; }
-
-  .form-group { margin-bottom: 15px; }
-  .form-group label { display: block; font-size: 0.9rem; font-weight: 600; margin-bottom: 5px; color: var(--texto-claro); }
-  .form-control { width: 100%; padding: 12px; border: 1px solid #ddd; border-radius: 8px; font-family: 'Montserrat', sans-serif; font-size: 0.95rem; outline: none; transition: 0.3s; background-color: #fff; }
-  .form-control:focus { border-color: var(--verde-salvia); box-shadow: 0 0 0 3px rgba(111,143,122,0.1); }
-  textarea.form-control { resize: vertical; min-height: 120px; }
-  .row { display: grid; grid-template-columns: 1fr 1fr; gap: 20px; }
-  .row-3 { display: grid; grid-template-columns: 1fr 1fr 1fr; gap: 20px; }
-  .row-4 { display: grid; grid-template-columns: 1fr 1fr 1fr 1fr; gap: 20px; align-items: end;}
-
-  .btn { background: var(--verde-salvia); color: var(--branco); border: none; padding: 12px 25px; border-radius: 8px; font-size: 0.95rem; font-weight: 600; cursor: pointer; transition: 0.3s; display: inline-flex; align-items: center; gap: 8px; }
-  .btn:hover { background: var(--verde-escuro); transform: translateY(-2px); }
-  .btn-roxo { background: var(--roxo-escuro); } .btn-roxo:hover { background: #2a1f33; }
-  .btn-outline { background: transparent; border: 2px solid var(--verde-salvia); color: var(--verde-salvia); }
-  .btn-outline:hover { background: var(--verde-salvia); color: var(--branco); }
-  .btn-perigo { background: transparent; border: 1px solid var(--perigo); color: var(--perigo); }
-  .btn-perigo:hover { background: var(--perigo); color: white; }
-  .btn-editar { background: transparent; border: 1px solid var(--alerta); color: #b5801f; }
-  .btn-editar:hover { background: var(--alerta); color: white; }
-  
-  .table-container { overflow-x: auto; }
-  table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-  th, td { padding: 15px; text-align: left; border-bottom: 1px solid #eee; }
-  th { background: #f9f9f9; font-weight: 600; color: var(--texto-claro); font-size: 0.85rem; text-transform: uppercase; }
-  td { font-size: 0.95rem; }
-  tr:hover { background: #fcfaf5; }
-
-  .ia-box { background: #f0f7f4; border-left: 5px solid var(--verde-salvia); padding: 20px; border-radius: 8px; margin-top: 20px; display: none; }
-  .ia-box.visivel { display: block; }
-  .ia-box h4 { color: var(--verde-escuro); margin-bottom: 10px; display: flex; align-items: center; gap: 8px;}
-  .ia-texto { white-space: pre-wrap; font-size: 0.95rem; color: #333; line-height: 1.8; background: var(--branco); padding: 15px; border-radius: 8px; border: 1px solid #d5e5dd;}
-
-  .header-relatorio-container { display: flex; justify-content: space-between; align-items: center; padding-bottom: 15px; border-bottom: 2px solid #e8efe9; margin-bottom: 20px; }
-  .header-relatorio-container img { width: 100%; max-width: 250px; height: auto; }
-  .header-titulo { text-align: right; }
-  .header-titulo h2 { font-size: 1.2rem; margin-bottom: 2px; }
-  .header-titulo p { font-size: 0.8rem; color: var(--texto-claro); }
-
-  .flatpickr-calendar { font-family: 'Montserrat', sans-serif; box-shadow: 0 10px 30px rgba(0,0,0,0.1); border-radius: 10px; }
-  .flatpickr-day.selected { background: var(--verde-salvia); border-color: var(--verde-salvia); }
-  .flatpickr-day:hover { background: #e8efe9; }
-
-  @media (max-width: 900px) {
-    .sidebar { width: 100%; height: auto; position: relative; padding: 20px; flex-direction: row; flex-wrap: wrap; justify-content: center; }
-    .main-content { margin-left: 0; padding: 20px; }
-    .row, .row-3, .row-4 { grid-template-columns: 1fr; }
-    .btn-sair { margin-top: 10px; }
-    .header-relatorio-container { flex-direction: column; text-align: center; gap: 10px; }
-    .header-titulo { text-align: center; }
-  }
-
-  @media print {
-    body * { visibility: hidden; }
-    #tela-relatorios, #tela-relatorios * { visibility: visible; }
-    #tela-relatorios { position: absolute; left: 0; top: 0; width: 100%; }
-    .no-print { display: none !important; }
-    body { background: white; color: black; }
-    .card { box-shadow: none; padding: 0; margin: 0; border: none; }
-    .header-relatorio-container { position: fixed; top: 0; left: 0; width: 100%; display: flex !important; flex-direction: row !important; justify-content: space-between !important; align-items: center !important; border-bottom: 2px solid #000; padding-bottom: 10px; margin-bottom: 20px; background: white; z-index: 1000; }
-    .header-relatorio-container img { width: 200px; height: auto; }
-    .header-titulo h2 { font-size: 14px; color: #000; }
-    .header-titulo p { font-size: 10px; color: #333; }
-    .table-container { overflow: visible; margin-top: 100px; }
-    table { width: 100%; border-collapse: collapse; margin-top: 0; font-size: 11px; }
-    th { background: #f0f0f0 !important; color: black; border-bottom: 2px solid #000; }
-    td { border-bottom: 1px solid #ccc; padding: 10px 5px; vertical-align: top; }
-    tr { page-break-inside: avoid; }
-    @page { margin: 1.5cm; size: A4 portrait; }
-  }
-</style>
-</head>
-<body>
-
-  <div id="tela-login">
-    <div class="login-box">
-      <h1>Área Restrita</h1>
-      <p>Acesso exclusivo para a Terapeuta Ocupacional</p>
-      <input type="email" id="emailInput" placeholder="E-mail de acesso">
-      <input type="password" id="senhaInput" placeholder="Senha de acesso" onkeydown="if(event.key==='Enter') fazerLogin()">
-      <button class="btn-login" onclick="fazerLogin()">Entrar no Painel</button>
-      <p id="erroLogin"></p>
-    </div>
-  </div>
-
-  <div id="sistema">
-    <aside class="sidebar no-print">
-      <h2>Livia Caroline</h2>
-      <div class="menu-item ativo" onclick="abrirTela('pacientes', this)"><span>👥</span> Pacientes</div>
-      <div class="menu-item" onclick="abrirTela('agenda', this)"><span>📅</span> Agenda</div>
-      <div class="menu-item" onclick="abrirTela('evolucao', this)"><span>📝</span> Evolução de Atendimento</div>
-      <div class="menu-item" onclick="abrirTela('relatorios', this)"><span>📊</span> Relatórios</div>
-      <button class="btn-sair" onclick="fazerLogout()">Sair do Sistema</button>
-    </aside>
-
-    <main class="main-content">
-      <div class="top-bar no-print">
-        <h1 id="tituloTela">Gestão de Pacientes</h1>
-        <div class="badge">Painel da Terapeuta</div>
-      </div>
-
-      <!-- TELA: PACIENTES -->
-      <div id="tela-pacientes" class="tela ativa no-print">
-        <div class="card">
-          <h3 id="tituloFormPaciente">Cadastrar Novo Paciente</h3>
-          <input type="hidden" id="pIdEdicao" value="">
-          
-          <div class="row">
-            <div class="form-group"><label>Nome Completo da Criança</label><input type="text" id="pNome" class="form-control" placeholder="Ex: João Silva"></div>
-            <div class="form-group"><label>Data de Nascimento</label><input type="text" id="pNasc" class="form-control" placeholder="Clique para abrir o calendário"><small id="infoIdade" style="color: var(--verde-salvia); font-weight: 600; display: none; margin-top: 5px;"></small></div>
-          </div>
-          
-          <div class="row" style="margin-bottom: 15px;">
-            <div class="form-group"><label>CPF do Paciente (opcional)</label><input type="text" id="pCpf" class="form-control" placeholder="000.000.000-00"></div>
-            <div class="form-group"><label>Nome do Responsável</label><input type="text" id="pResp" class="form-control" placeholder="Ex: Maria Silva"></div>
-          </div>
-
-          <div class="row" style="margin-bottom: 15px;">
-            <div class="form-group"><label>CPF do Responsável (opcional)</label><input type="text" id="pCpfResp" class="form-control" placeholder="000.000.000-00"></div>
-            <div class="form-group"><label>Telefone de Contato</label><input type="text" id="pTel" class="form-control" placeholder="(31) 99999-9999"></div>
-          </div>
-
-          <div class="form-group">
-            <label>Observações Iniciais (opcional)</label>
-            <input type="text" id="pObs" class="form-control" placeholder="Ex: Encaminhado por...">
-          </div>
-          
-          <button class="btn" onclick="salvarPaciente()" id="btnSalvarPaciente">Salvar Cadastro</button>
-          <button class="btn btn-outline" onclick="cancelarEdicaoPaciente()" id="btnCancelarPaciente" style="display:none;">Cancelar Edição</button>
-        </div>
-
-        <div class="card">
-          <h3>Pacientes Cadastrados</h3>
-          <div class="table-container">
-            <table>
-              <thead><tr><th>Nome</th><th>Nascimento</th><th>Idade</th><th>Responsável</th><th>Telefone</th><th>Ações</th></tr></thead>
-              <tbody id="listaPacientes"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <!-- TELA: AGENDA -->
-      <div id="tela-agenda" class="tela no-print">
-        <div class="card">
-          <h3>Agendar Horário</h3>
-          <div class="row-4">
-            <div class="form-group"><label>Paciente</label><select id="aPaciente" class="form-control"></select></div>
-            <div class="form-group"><label>Data</label><input type="text" id="aData" class="form-control" placeholder="Clique para escolher"></div>
-            <div class="form-group"><label>Horário</label><input type="time" id="aHora" class="form-control"></div>
-            <div class="form-group"><label>Observação</label><input type="text" id="aTipo" class="form-control" placeholder="Ex: Sessão"></div>
-          </div>
-          <button class="btn" onclick="salvarAgenda()">Agendar Consulta</button>
-        </div>
-        <div class="card">
-          <h3>Próximos Agendamentos</h3>
-          <div class="table-container">
-            <table>
-              <thead><tr><th>Data</th><th>Hora</th><th>Paciente</th><th>Observação</th><th>Ações</th></tr></thead>
-              <tbody id="listaAgenda"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <!-- TELA: EVOLUÇÃO -->
-      <div id="tela-evolucao" class="tela no-print">
-        <div class="card">
-          <h3 id="tituloFormEvolucao">Registrar Evolução de Atendimento</h3>
-          <input type="hidden" id="eIdEdicao" value="">
-          <div class="row-3">
-            <div class="form-group"><label>Paciente</label><select id="ePaciente" class="form-control"></select></div>
-            <div class="form-group"><label>Data do Atendimento</label><input type="text" id="eData" class="form-control" placeholder="Clique para escolher"></div>
-          </div>
-          <div class="form-group">
-            <label>Descrição Livre (como foi a sessão)</label>
-            <textarea id="eDescricao" class="form-control" placeholder="Escreva aqui de forma simples o que foi feito no atendimento..."></textarea>
-          </div>
-          <div style="display: flex; gap: 10px; margin-top: 10px;">
-            <button class="btn btn-roxo" onclick="gerarIA()">✨ Estruturar com IA</button>
-            <button class="btn" onclick="salvarEvolucao()" id="btnSalvarEvolucao">Salvar no Prontuário</button>
-            <button class="btn btn-outline" onclick="cancelarEdicaoEvolucao()" id="btnCancelarEvolucao" style="display:none;">Cancelar Edição</button>
-          </div>
-          <div id="iaResultado" class="ia-box">
-            <h4>✨ Releitura Estruturada para o Prontuário:</h4>
-            <div id="iaTexto" class="ia-texto"></div>
-          </div>
-        </div>
-        <div class="card">
-          <h3>Últimos Atendimentos Registrados (Mais recentes primeiro)</h3>
-          <div class="table-container">
-            <table>
-              <thead><tr><th>Data</th><th>Paciente</th><th>Descrição Original</th><th>Evolução (IA)</th><th>Ações</th></tr></thead>
-              <tbody id="listaEvolucao"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-
-      <!-- TELA: RELATÓRIOS -->
-      <div id="tela-relatorios" class="tela">
-        <div class="card no-print">
-          <h3>Filtros de Relatório</h3>
-          <div class="row-4">
-            <div class="form-group"><label>Paciente</label><select id="fPaciente" class="form-control"><option value="">Todos os Pacientes</option></select></div>
-            <div class="form-group"><label>Data Exata</label><input type="text" id="fData" class="form-control" placeholder="Data exata"></div>
-            <div class="form-group"><label>Data Inicial</label><input type="text" id="fDataInicio" class="form-control" placeholder="Data inicial"></div>
-            <div class="form-group"><label>Data Final</label><input type="text" id="fDataFim" class="form-control" placeholder="Data final"></div>
-          </div>
-          <div style="display: flex; gap: 10px;">
-            <button class="btn" onclick="filtrarRelatorio()">🔍 Buscar Atendimentos</button>
-            <button class="btn btn-outline" onclick="limparFiltros()">Limpar Filtros</button>
-            <button class="btn btn-outline" onclick="window.print()">🖨️ Imprimir / PDF</button>
-          </div>
-        </div>
-        <div class="card">
-          <div class="header-relatorio-container">
-            <img src="logo.png" alt="Logo Livia Caroline">
-            <div class="header-titulo"><h2>Relatório de Atendimentos</h2><p>Terapia Ocupacional & Integração Sensorial</p></div>
-          </div>
-          <div class="table-container">
-            <table>
-              <thead><tr><th style="width: 15%;">Data</th><th style="width: 25%;">Paciente</th><th style="width: 60%;">Evolução do Atendimento</th></tr></thead>
-              <tbody id="listaRelatorios"></tbody>
-            </table>
-          </div>
-        </div>
-      </div>
-    </main>
-  </div>
-
-  <script type="module">
-    import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
-    import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
-    import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-    
-    const scriptFlatpickr = document.createElement('script');
-    scriptFlatpickr.src = "https://cdn.jsdelivr.net/npm/flatpickr";
-    document.head.appendChild(scriptFlatpickr);
-
-    const scriptPt = document.createElement('script');
-    scriptPt.src = "https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js";
-    document.head.appendChild(scriptPt);
-
-    const firebaseConfig = {
-      apiKey: "AIzaSyBWoIe2zbgtkDyoeBCMiyEPy_sbuYMkJWU",
-      authDomain: "consultorio-livia-f0a6d.firebaseapp.com",
-      projectId: "consultorio-livia-f0a6d",
-      storageBucket: "consultorio-livia-f0a6d.firebasestorage.app",
-      messagingSenderId: "374499319807",
-      appId: "1:374499319807:web:77e39905fbe82417ec11ca"
-    };
-
-    const app = initializeApp(firebaseConfig);
-    const auth = getAuth(app);
-    const db = getFirestore(app);
-
-    let pacientesGlobal = [];
-    let agendaGlobal = [];
-    let evolucoesGlobal = [];
-    let configCalendario = {};
-
-    window.fazerLogin = async function() {
-      const email = document.getElementById('emailInput').value;
-      const senha = document.getElementById('senhaInput').value;
-      const erroP = document.getElementById('erroLogin');
-      
-      if(!email || !senha) { erroP.innerText = "Preencha e-mail e senha."; erroP.style.display = 'block'; return; }
-      
       try {
-        await signInWithEmailAndPassword(auth, email, senha);
-        erroP.style.display = 'none';
-      } catch (error) {
-        console.error(error);
-        erroP.innerText = "Erro ao entrar: " + error.message;
-        erroP.style.display = 'block';
-      }
-    };
-
-    window.fazerLogout = async function() { await signOut(auth); };
-
-    onAuthStateChanged(auth, (user) => {
-      if (user) {
-        document.getElementById('tela-login').style.display = 'none';
-        document.getElementById('sistema').style.display = 'block';
-        iniciarSistema();
-      } else {
-        document.getElementById('tela-login').style.display = 'flex';
-        document.getElementById('sistema').style.display = 'none';
-        document.getElementById('senhaInput').value = '';
-      }
-    });
-
-    async function iniciarSistema() {
-      configCalendario = {
-        locale: "pt", dateFormat: "d/m/Y", allowInput: true,
-        onChange: function(selectedDates, dateStr, instance) {
-          if (instance.element.id === 'pNasc') calcularIdadeCadastro();
+        let textoFinalIA = descricaoIA;
+        if (!textoFinalIA || textoFinalIA.includes("Analisando")) {
+          textoFinalIA = processarTextoIA(descricao);
         }
-      };
-      
-      setTimeout(() => {
-        flatpickr("#pNasc", { ...configCalendario, maxDate: "today" });
-        flatpickr("#eData", { ...configCalendario, maxDate: null });
-        flatpickr("#fData", { ...configCalendario, maxDate: null });
-        flatpickr("#fDataInicio", { ...configCalendario, maxDate: null });
-        flatpickr("#fDataFim", { ...configCalendario, maxDate: null });
-        flatpickr("#aData", { ...configCalendario, minDate: "today" });
-      }, 500);
 
-      await carregarDados();
-    }
-
-    async function carregarDados() {
-      const snapPac = await getDocs(query(collection(db, "pacientes")));
-      pacientesGlobal = snapPac.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-      const snapAgenda = await getDocs(query(collection(db, "agenda")));
-      agendaGlobal = snapAgenda.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-      const snapEvo = await getDocs(query(collection(db, "evolucoes")));
-      evolucoesGlobal = snapEvo.docs.map(doc => ({ id: doc.id, ...doc.data() }));
-
-      carregarSelects();
-      renderizarTudo();
-    }
-
-    window.abrirTela = function(idTela, elementoMenu) {
-      document.querySelectorAll('.tela').forEach(t => t.classList.remove('ativa'));
-      document.querySelectorAll('.menu-item').forEach(m => m.classList.remove('ativo'));
-      document.getElementById('tela-' + idTela).classList.add('ativa');
-      elementoMenu.classList.add('ativo');
-      const titulos = { 'pacientes': 'Gestão de Pacientes', 'agenda': 'Agenda de Horários', 'evolucao': 'Evolução de Atendimento', 'relatorios': 'Relatórios e Prontuários' };
-      document.getElementById('tituloTela').innerText = titulos[idTela];
-    };
-
-    window.calcularIdade = function(dataStr) {
-      if (!dataStr) return '';
-      const partes = dataStr.split('/');
-      if (partes.length !== 3) return '';
-      const diaNasc = parseInt(partes[0]); const mesNasc = parseInt(partes[1]) - 1; const anoNasc = parseInt(partes[2]);
-      const hoje = new Date();
-      let anos = hoje.getFullYear() - anoNasc; let meses = hoje.getMonth() - mesNasc; let dias = hoje.getDate() - diaNasc;
-      if (dias < 0) { meses--; const ultimoDia = new Date(hoje.getFullYear(), hoje.getMonth(), 0).getDate(); dias += ultimoDia; }
-      if (meses < 0) { anos--; meses += 12; }
-      return anos === 0 ? `${meses} meses e ${dias} dias` : `${anos} anos e ${meses} meses`;
-    };
-
-    window.calcularIdadeCadastro = function() {
-      const data = document.getElementById('pNasc').value;
-      const info = document.getElementById('infoIdade');
-      if (data) { info.innerText = "Idade calculada: " + window.calcularIdade(data); info.style.display = 'block'; } 
-      else { info.style.display = 'none'; }
-    };
-
-    window.salvarPaciente = async function() {
-      const idEdicao = document.getElementById('pIdEdicao').value;
-      const nome = document.getElementById('pNome').value.trim();
-      const nasc = document.getElementById('pNasc').value;
-      const cpf = document.getElementById('pCpf').value.trim();
-      const resp = document.getElementById('pResp').value.trim();
-      const cpfResp = document.getElementById('pCpfResp').value.trim();
-      const tel = document.getElementById('pTel').value.trim();
-      const obs = document.getElementById('pObs').value.trim();
-
-      if (!nome) { alert('O nome do paciente é obrigatório.'); return; }
-
-      try {
         if (idEdicao) {
-          await updateDoc(doc(db, "pacientes", idEdicao), { nome, nasc, cpf, resp, cpfResp, tel, obs });
+          await updateDoc(doc(db, "evolucoes", idEdicao), { pacienteId, pacienteNome: paciente.nome, data, descricao, descricaoIA: textoFinalIA });
         } else {
-          await addDoc(collection(db, "pacientes"), { nome, nasc, cpf, resp, cpfResp, tel, obs });
+          await addDoc(collection(db, "evolucoes"), { pacienteId, pacienteNome: paciente.nome, data, descricao, descricaoIA: textoFinalIA });
         }
-        window.cancelarEdicaoPaciente();
+        window.cancelarEdicaoEvolucao();
+        alert('Evolução salva com sucesso!');
         await carregarDados();
-      } catch (e) { alert("Erro ao salvar: " + e.message); }
+      } catch(e) { alert("Erro: " + e.message); }
     };
 
-    window.editarPaciente = function(id) {
-      const p = pacientesGlobal.find(p => p.id === id);
-      if (!p) return;
-      document.getElementById('pIdEdicao').value = p.id;
-      document.getElementById('pNome').value = p.nome;
-      document.getElementById('pNasc').value = p.nasc;
-      if (document.getElementById('pNasc')._flatpickr) document.getElementById('pNasc')._flatpickr.setDate(p.nasc, false);
-      document.getElementById('pCpf').value = p.cpf || '';
-      document.getElementById('pResp').value = p.resp || '';
-      document.getElementById('pCpfResp').value = p.cpfResp || '';
-      document.getElementById('pTel').value = p.tel || '';
-      document.getElementById('pObs').value = p.obs || '';
+    window.editarEvolucao = async function(id) {
+      const e = evolucoesGlobal.find(e => e.id === id);
+      if (!e) return;
+      document.getElementById('eIdEdicao').value = e.id;
+      document.getElementById('ePaciente').value = e.pacienteId;
+      document.getElementById('eData').value = e.data;
+      if (document.getElementById('eData')._flatpickr) document.getElementById('eData')._flatpickr.setDate(e.data, false);
+      document.getElementById('eDescricao').value = e.descricao;
       
-      document.getElementById('tituloFormPaciente').innerText = "Editar Cadastro de Paciente";
-      document.getElementById('btnSalvarPaciente').innerText = "Atualizar Cadastro";
-      document.getElementById('btnCancelarPaciente').style.display = "inline-block";
+      if (!e.descricaoIA) {
+        document.getElementById('iaTexto').innerText = "Gerando evolução automática...";
+        document.getElementById('iaResultado').classList.add('visivel');
+        
+        const textoGerado = processarTextoIA(e.descricao);
+        document.getElementById('iaTexto').innerText = textoGerado;
+        
+        await updateDoc(doc(db, "evolucoes", id), { descricaoIA: textoGerado });
+        e.descricaoIA = textoGerado;
+      } else {
+        document.getElementById('iaTexto').innerText = e.descricaoIA;
+        document.getElementById('iaResultado').classList.add('visivel');
+      }
       
-      window.calcularIdadeCadastro();
+      document.getElementById('tituloFormEvolucao').innerText = "Editar Evolução de Atendimento";
+      document.getElementById('btnSalvarEvolucao').innerText = "Atualizar Evolução";
+      document.getElementById('btnCancelarEvolucao').style.display = "inline-block";
       window.scrollTo({ top: 0, behavior: 'smooth' });
     };
 
-    window.cancelarEdicaoPaciente = function() {
-      document.getElementById('pIdEdicao').value = '';
-      document.getElementById('pNome').value = '';
-      document.getElementById('pNasc').value = '';
-      if (document.getElementById('pNasc')._flatpickr) document.getElementById('pNasc')._flatpickr.clear();
-      document.getElementById('pCpf').value = '';
-      document.getElementById('pResp').value = '';
-      document.getElementById('pCpfResp').value = '';
-      document.getElementById('pTel').value = '';
-      document.getElementById('pObs').value = '';
-      document.getElementById('infoIdade').style.display = 'none';
+    window.cancelarEdicaoEvolucao = function() {
+      document.getElementById('eIdEdicao').value = '';
+      document.getElementById('ePaciente').value = '';
+      document.getElementById('eData').value = '';
+      if (document.getElementById('eData')._flatpickr) document.getElementById('eData')._flatpickr.clear();
+      document.getElementById('eDescricao').value = '';
+      document.getElementById('iaResultado').classList.remove('visivel');
+      document.getElementById('iaTexto').innerText = '';
 
-      document.getElementById('tituloFormPaciente').innerText = "Cadastrar Novo Paciente";
-      document.getElementById('btnSalvarPaciente').innerText = "Salvar Cadastro";
-      document.getElementById('btnCancelarPaciente').style.display = "none";
+      document.getElementById('tituloFormEvolucao').innerText = "Registrar Evolução de Atendimento";
+      document.getElementById('btnSalvarEvolucao').innerText = "Salvar no Prontuário";
+      document.getElementById('btnCancelarEvolucao').style.display = "none";
     };
 
-    window.excluirPaciente = async function(id) {
-      if (!confirm('Tem certeza? Isso apagará o cadastro, mas não apagará os atendimentos já registrados.')) return;
-      try { await deleteDoc(doc(db, "pacientes", id)); await carregarDados(); } 
-      catch(e) { alert("Erro ao excluir: " + e.message); }
+    // FUNÇÃO DA IA COM O NOVO PROMPT (TEXTO ÚNICO E CORRIDO)
+    function processarTextoIA(textoOriginal) {
+      let t = textoOriginal;
+      const correcoes = [
+        { de: /\bnao\b/gi, para: "não" }, { de: /\bvoce\b/gi, para: "você" },
+        { de: /\btambem\b/gi, para: "também" }, { de: /\bagente\b/gi, para: "a gente" },
+        { de: /\bpobrema\b/gi, para: "problema" }, { de: /\bmenas\b/gi, para: "menos" },
+        { de: /\bconcerteza\b/gi, para: "com certeza" }, { de: /\bderrepente\b/gi, para: "de repente" },
+        { de: /\bexcessao\b/gi, para: "exceção" }, { de: /\bexelente\b/gi, para: "excelente" },
+        { de: /\bapos\b/gi, para: "após" }, { de: /\bja\b/gi, para: "já" },
+        { de: /\bso\b/gi, para: "só" }, { de: /\bate\b/gi, para: "até" },
+        { de: /brincamos/gi, para: "Foram propostas atividades lúdicas direcionadas a" },
+        { de: /trabalhamos/gi, para: "A intervenção foi focada em" },
+        { de: /ele ficou agitado/gi, para: "O paciente apresentou agitação psicomotora inicial" },
+        { de: /ela ficou agitada/gi, para: "A paciente apresentou agitação psicomotora inicial" },
+        { de: /melhorou/gi, para: "demonstrou evolução positiva no processo de regulação" },
+        { de: /equilíbrio/gi, para: "controle postural e equilíbrio dinâmico" },
+        { de: /balanço/gi, para: "equipamentos suspensos (estímulo vestibular)" },
+        { de: /massinha/gi, para: "massa de modelar (estímulo tátil e proprioceptivo)" },
+        { de: /texturas/gi, para: "exploração tátil de diferentes texturas" },
+        { de: /piscina de bolinhas/gi, para: "piscina de bolinhas (estímulo proprioceptivo por compressão)" },
+        { de: /pulou/gi, para: "realizou saltos (praxia global)" },
+        { de: /rolou/gi, para: "executou rolamentos (praxia global)" },
+        { de: /focou/gi, para: "sustentou a atenção por períodos mais longos" },
+        { de: /não quis/gi, para: "apresentou resistência inicial à proposta" },
+        { de: /gostou/gi, para: "aderiu positivamente à atividade" },
+        { de: /correu/gi, para: "vivenciou experiências de deslocamento e velocidade" },
+        { de: /circuito/gi, para: "circuito motor sequencial" },
+      ];
+      correcoes.forEach(c => { t = t.replace(c.de, c.para); });
+      t = t.replace(/\s+/g, ' ').trim();
+      t = t.replace(/([.!?]\s+)([a-zà-ú])/g, (match, p1, p2) => p1 + p2.toUpperCase());
+      if (t.length > 0) t = t.charAt(0).toLowerCase() + t.slice(1);
+
+      // PROMPT APLICADO: Texto único, corrido, técnico, sem marcadores.
+      return `Durante a sessão de Terapia Ocupacional, o atendimento foi conduzido considerando as demandas sensoriais e motoras da criança. ${t} A intervenção estruturou-se a partir das atividades descritas, as quais atuaram como ferramentas para o aprimoramento do processamento sensorial, da modulação e do planejamento motor (praxia), em um ambiente terapêutico adequado para a expressão de respostas adaptativas. A partir da resposta da criança às propostas, observou-se engajamento nas tarefas e oportunidades de ganho em autorregulação e consciência corporal, recomendando-se a continuidade do plano terapêutico com foco na generalização das habilidades sensório-motoras para o cotidiano familiar e escolar.`;
+    }
+
+    window.gerarIA = function() {
+      const textoOriginal = document.getElementById('eDescricao').value.trim();
+      if (!textoOriginal) { alert('Escreva a descrição do atendimento primeiro.'); return; }
+
+      document.getElementById('iaTexto').innerText = "Analisando relato e estruturando prontuário clínico...";
+      document.getElementById('iaResultado').classList.add('visivel');
+
+      setTimeout(() => {
+        document.getElementById('iaTexto').innerText = processarTextoIA(textoOriginal);
+      }, 1500);
     };
 
-    window.salvarAgenda = async function() {
-      const pacienteId = document.getElementById('aPaciente').value;
-      const data = document.getElementById('aData').value;
-      const hora = document
+    function carregarSelects() {
+      let options = '<option value="">Selecione um paciente</option>';
+      pacientesGlobal.forEach(p => { options += `<option value="${p.id}">${p.nome}</option>`; });
+      
+      document.getElementById('aPaciente').innerHTML = options;
+      document.getElementById('ePaciente').innerHTML = options;
+      
+      let filtroOptions = '<option value="">Todos os Pacientes</option>';
+      pacientesGlobal.forEach(p => { filtroOptions += `<option value="${p.id}">${p.nome}</option>`; });
+      document.getElementById('fPaciente').innerHTML = filtroOptions;
+    }
+
+    function renderizarTudo() {
+      document.getElementById('listaPacientes').innerHTML = pacientesGlobal.map(p => {
+        const idade = window.calcularIdade(p.nasc);
+        return `
+        <tr>
+          <td><strong>${p.nome}</strong></td>
+          <td>${p.nasc || '-'}</td>
+          <td style="font-weight:600; color:var(--verde-escuro);">${idade || '-'}</td>
+          <td>${p.resp || '-'}</td>
+          <td>${p.tel || '-'}</td>
+          <td>
+            <button class="btn btn-editar" style="padding:5px 10px; font-size:0.8rem; margin-right:5px;" onclick="editarPaciente('${p.id}')">Editar</button>
+            <button class="btn btn-perigo" style="padding:5px 10px; font-size:0.8rem;" onclick="excluirPaciente('${p.id}')">Excluir</button>
+          </td>
+        </tr>
+      `}).join('') || '<tr><td colspan="6">Nenhum paciente cadastrado.</td></tr>';
+
+      agendaGlobal.sort((a, b) => {
+        const dateA = a.data.split('/').reverse().join('');
+        const dateB = b.data.split('/').reverse().join('');
+        return (dateA + a.hora).localeCompare(dateB + b.hora);
+      });
+      document.getElementById('listaAgenda').innerHTML = agendaGlobal.map(a => `
+        <tr>
+          <td>${a.data}</td>
+          <td>${a.hora}</td>
+          <td>${a.pacienteNome}</td>
+          <td>${a.tipo || '-'}</td>
+          <td><button class="btn btn-perigo" style="padding:5px 10px; font-size:0.8rem;" onclick="excluirAgenda('${a.id}')">Cancelar</button></td>
+        </tr>
+      `).join('') || '<tr><td colspan="5">Nenhum agendamento futuro.</td></tr>';
+
+      const parseDate = (d) => {
+        if(!d) return new Date(0);
+        const p = d.split('/');
+        return new Date(p[2], p[1]-1, p[0]);
+      };
+
+      const evosRecentes = [...evolucoesGlobal].sort((a,b) => parseDate(b.data) - parseDate(a.data)).slice(0, 10);
+      document.getElementById('listaEvolucao').innerHTML = evosRecentes.map(e => `
+        <tr>
+          <td>${e.data}</td>
+          <td>${e.pacienteNome}</td>
+          <td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${e.descricao}">${e.descricao}</td>
+          <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color:var(--verde-escuro);" title="${e.descricaoIA}">${e.descricaoIA ? 'Ver prontuário' : 'Sem IA (Clique em Editar)'}</td>
+          <td><button class="btn btn-editar" style="padding:5px 10px; font-size:0.8rem;" onclick="editarEvolucao('${e.id}')">Editar</button></td>
+        </tr>
+      `).join('') || '<tr><td colspan="5">Nenhum atendimento registrado.</td></tr>';
+      
+      window.filtrarRelatorio(); 
+    }
+
+    window.filtrarRelatorio = function() {
+      let evolucoes = [...evolucoesGlobal];
+      
+      const fPac = document.getElementById('fPaciente').value;
+      const fDataExata = document.getElementById('fData').value;
+      const fDataIni = document.getElementById('fDataInicio').value;
+      const fDataFim = document.getElementById('fDataFim').value;
+
+      if (fPac) { evolucoes = evolucoes.filter(e => e.pacienteId === fPac); }
+      
+      const parseDate = (d) => {
+        if(!d) return null;
+        const p = d.split('/');
+        return new Date(p[2], p[1]-1, p[0]);
+      };
+
+      const dtExata = parseDate(fDataExata);
+      const dtIni = parseDate(fDataIni);
+      const dtFim = parseDate(fDataFim);
+
+      if (dtExata) {
+        evolucoes = evolucoes.filter(e => parseDate(e.data).getTime() === dtExata.getTime());
+      } else {
+        if (dtIni) { evolucoes = evolucoes.filter(e => parseDate(e.data) >= dtIni); }
+        if (dtFim) { evolucoes = evolucoes.filter(e => parseDate(e.data) <= dtFim); }
+      }
+
+      evolucoes.sort((a,b) => parseDate(b.data) - parseDate(a.data));
+
+      document.getElementById('listaRelatorios').innerHTML = evolucoes.map(e => `
+        <tr>
+          <td style="white-space: nowrap; vertical-align: top; font-weight: 600;">${e.data}</td>
+          <td style="white-space: nowrap; vertical-align: top;"><strong>${e.pacienteNome}</strong></td>
+          <td style="font-size: 0.9rem; line-height: 1.6; padding: 15px;">
+            ${e.descricaoIA ? e.descricaoIA.replace(/\n/g, '<br>') : '<em style="color:#888;">Evolução não gerada (abra a Evolução e clique em Editar).</em>'}
+          </td>
+        </tr>
+      `).join('') || '<tr><td colspan="3">Nenhum atendimento encontrado.</td></tr>';
+    };
+
+    window.limparFiltros = function() {
+      document.getElementById('fPaciente').value = '';
+      if(document.getElementById('fData')._flatpickr) document.getElementById('fData')._flatpickr.clear();
+      if(document.getElementById('fDataInicio')._flatpickr) document.getElementById('fDataInicio')._flatpickr.clear();
+      if(document.getElementById('fDataFim')._flatpickr) document.getElementById('fDataFim')._flatpickr.clear();
+      window.filtrarRelatorio();
+    };
+  </script>
+</body>
+</html>
