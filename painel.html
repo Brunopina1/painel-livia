@@ -68,8 +68,7 @@
   .btn-editar { background: transparent; border: 1px solid var(--alerta); color: #b5801f; }
   .btn-editar:hover { background: var(--alerta); color: white; }
   
-  /* Scroll na tabela de evoluções */
-  .table-scroll { max-height: 400px; overflow-y: auto; border: 1px solid #eee; border-radius: 8px; }
+  .table-scroll { max-height: 450px; overflow-y: auto; border: 1px solid #eee; border-radius: 8px; margin-top: 15px; }
   .table-scroll table { margin-top: 0; }
   .table-scroll th { position: sticky; top: 0; z-index: 10; }
 
@@ -90,6 +89,9 @@
   .header-titulo { text-align: right; }
   .header-titulo h2 { font-size: 1.2rem; margin-bottom: 2px; }
   .header-titulo p { font-size: 0.8rem; color: var(--texto-claro); }
+
+  /* CONTADOR DE RESULTADOS */
+  .contador-box { background: var(--verde-claro); color: var(--verde-escuro); padding: 10px 15px; border-radius: 8px; font-weight: 600; font-size: 0.95rem; margin-bottom: 15px; display: inline-block; border-left: 4px solid var(--verde-salvia); }
 
   .flatpickr-calendar { font-family: 'Montserrat', sans-serif; box-shadow: 0 10px 30px rgba(0,0,0,0.1); border-radius: 10px; }
   .flatpickr-day.selected { background: var(--verde-salvia); border-color: var(--verde-salvia); }
@@ -242,7 +244,14 @@
         </div>
         
         <div class="card">
-          <h3>Todos os Atendimentos Registrados (Mais antigos primeiro)</h3>
+          <h3>Histórico de Atendimentos</h3>
+          <div class="row" style="margin-bottom: 15px;">
+            <div class="form-group" style="margin-bottom: 0;">
+              <input type="text" id="buscaEvolucao" class="form-control" placeholder="🔍 Digite o nome do paciente para buscar..." onkeyup="renderizarHistorico()">
+            </div>
+          </div>
+          <div class="contador-box" id="contadorHistorico">Mostrando todos os atendimentos</div>
+          
           <div class="table-scroll">
             <table>
               <thead><tr><th>Data</th><th>Paciente</th><th>Descrição Original</th><th>Evolução (IA)</th><th>Ações</th></tr></thead>
@@ -268,11 +277,15 @@
             <button class="btn btn-outline" onclick="window.print()">🖨️ Imprimir / PDF</button>
           </div>
         </div>
+        
         <div class="card">
+          <div class="contador-box" id="contadorRelatorio" style="margin-bottom: 10px;">Nenhum atendimento buscado</div>
+          
           <div class="header-relatorio-container">
             <img src="logo.png" alt="Logo Livia Caroline">
             <div class="header-titulo"><h2>Relatório de Atendimentos</h2><p>Terapia Ocupacional & Integração Sensorial</p></div>
           </div>
+          
           <div class="table-container">
             <table>
               <thead><tr><th style="width: 15%;">Data</th><th style="width: 25%;">Paciente</th><th style="width: 60%;">Evolução do Atendimento</th></tr></thead>
@@ -298,7 +311,7 @@
     document.head.appendChild(scriptPt);
 
     const firebaseConfig = {
-      apiKey: "AIzaSyBWoie2zbgtkDyoeBCMiyEPy_sbuYMkJWU",
+      apiKey: "AIzaSyBWoIe2zbgtkDyoeBCMiyEPy_sbuYMkJWU",
       authDomain: "consultorio-livia-f0a6d.firebaseapp.com",
       projectId: "consultorio-livia-f0a6d",
       storageBucket: "consultorio-livia-f0a6d.firebasestorage.app",
@@ -387,6 +400,8 @@
       elementoMenu.classList.add('ativo');
       const titulos = { 'pacientes': 'Gestão de Pacientes', 'agenda': 'Agenda de Horários', 'evolucao': 'Evolução de Atendimento', 'relatorios': 'Relatórios e Prontuários' };
       document.getElementById('tituloTela').innerText = titulos[idTela];
+      
+      if(idTela === 'evolucao') renderizarHistorico();
     };
 
     window.calcularIdade = function(dataStr) {
@@ -639,6 +654,47 @@
       document.getElementById('fPaciente').innerHTML = filtroOptions;
     }
 
+    // FUNÇÃO NOVA PARA O HISTÓRICO COM BUSCA
+    window.renderizarHistorico = function() {
+      const termo = document.getElementById('buscaEvolucao').value.toLowerCase().trim();
+      const parseDate = (d) => {
+        if(!d) return new Date(0);
+        const p = d.split('/');
+        return new Date(p[2], p[1]-1, p[0]);
+      };
+
+      let filtradas = [...evolucoesGlobal].sort((a,b) => parseDate(a.data) - parseDate(b.data));
+
+      if (termo) {
+        filtradas = filtradas.filter(e => e.pacienteNome.toLowerCase().includes(termo));
+      }
+
+      // Mostra no máximo 15 resultados se não estiver buscando
+      if (!termo && filtradas.length > 15) {
+        filtradas = filtradas.slice(0, 15);
+      }
+
+      document.getElementById('listaEvolucao').innerHTML = filtradas.map(e => `
+        <tr>
+          <td>${e.data}</td>
+          <td>${e.pacienteNome}</td>
+          <td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${e.descricao}">${e.descricao}</td>
+          <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color:var(--verde-escuro);" title="${e.descricaoIA}">${e.descricaoIA ? 'Ver prontuário' : 'Sem IA'}</td>
+          <td>
+            <button class="btn btn-editar" style="padding:5px 10px; font-size:0.8rem; margin-right:5px;" onclick="editarEvolucao('${e.id}')">Editar</button>
+            <button class="btn btn-perigo" style="padding:5px 10px; font-size:0.8rem;" onclick="excluirEvolucao('${e.id}')">Excluir</button>
+          </td>
+        </tr>
+      `).join('') || '<tr><td colspan="5" style="text-align: center; color: #888;">Nenhum atendimento encontrado.</td></tr>';
+      
+      const countBox = document.getElementById('contadorHistorico');
+      if (termo) {
+        countBox.innerText = `Exibindo ${filtradas.length} atendimento(s) encontrados para "${termo}"`;
+      } else {
+        countBox.innerText = `Exibindo os 15 últimos atendimentos (use a busca para filtrar)`;
+      }
+    };
+
     function renderizarTudo() {
       document.getElementById('listaPacientes').innerHTML = pacientesGlobal.map(p => {
         const idade = window.calcularIdade(p.nasc);
@@ -671,29 +727,12 @@
         </tr>
       `).join('') || '<tr><td colspan="5">Nenhum agendamento futuro.</td></tr>';
 
-      const parseDate = (d) => {
-        if(!d) return new Date(0);
-        const p = d.split('/');
-        return new Date(p[2], p[1]-1, p[0]);
-      };
-
-      // CORREÇÃO: Mostrando todos e do mais antigo para o mais novo na tabela de evolução
-      const evosOrdenadas = [...evolucoesGlobal].sort((a,b) => parseDate(a.data) - parseDate(b.data));
+      window.renderizarHistorico(); // Chama a nova função de histórico
       
-      document.getElementById('listaEvolucao').innerHTML = evosOrdenadas.map(e => `
-        <tr>
-          <td>${e.data}</td>
-          <td>${e.pacienteNome}</td>
-          <td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${e.descricao}">${e.descricao}</td>
-          <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color:var(--verde-escuro);" title="${e.descricaoIA}">${e.descricaoIA ? 'Ver prontuário' : 'Sem IA'}</td>
-          <td>
-            <button class="btn btn-editar" style="padding:5px 10px; font-size:0.8rem; margin-right:5px;" onclick="editarEvolucao('${e.id}')">Editar</button>
-            <button class="btn btn-perigo" style="padding:5px 10px; font-size:0.8rem;" onclick="excluirEvolucao('${e.id}')">Excluir</button>
-          </td>
-        </tr>
-      `).join('') || '<tr><td colspan="5">Nenhum atendimento registrado.</td></tr>';
-      
-      window.filtrarRelatorio(); 
+      // Se a tela de relatório já estiver aberta, mantém o resultado
+      if(document.getElementById('tela-relatorios').classList.contains('ativa')) {
+         window.filtrarRelatorio();
+      }
     }
 
     window.filtrarRelatorio = function() {
@@ -703,6 +742,13 @@
       const fDataExata = document.getElementById('fData').value;
       const fDataIni = document.getElementById('fDataInicio').value;
       const fDataFim = document.getElementById('fDataFim').value;
+
+      if (!fPac && !fDataExata && !fDataIni && !fDataFim) {
+        document.getElementById('contadorRelatorio').innerText = "Aplique um filtro acima para buscar";
+        document.getElementById('contadorRelatorio').style.display = 'inline-block';
+        document.getElementById('listaRelatorios').innerHTML = '';
+        return;
+      }
 
       if (fPac) { evolucoes = evolucoes.filter(e => e.pacienteId === fPac); }
       
@@ -723,8 +769,12 @@
         if (dtFim) { evolucoes = evolucoes.filter(e => parseDate(e.data) <= dtFim); }
       }
 
-      // Relatório mantém a ordem decrescente (mais novos primeiro) para facilitar leitura
+      // Relatório mantém a ordem decrescente (mais novos primeiro)
       evolucoes.sort((a,b) => parseDate(b.data) - parseDate(a.data));
+
+      const countBox = document.getElementById('contadorRelatorio');
+      countBox.innerText = `Resultado: ${evolucoes.length} atendimento(s) encontrado(s)`;
+      countBox.style.display = 'inline-block';
 
       document.getElementById('listaRelatorios').innerHTML = evolucoes.map(e => `
         <tr>
@@ -734,7 +784,7 @@
             ${e.descricaoIA ? e.descricaoIA.replace(/\n/g, '<br>') : '<em style="color:#888;">Evolução não gerada (abra a Evolução e clique em Editar).</em>'}
           </td>
         </tr>
-      `).join('') || '<tr><td colspan="3">Nenhum atendimento encontrado.</td></tr>';
+      `).join('') || '<tr><td colspan="3" style="text-align: center; color: #888; padding: 30px;">Nenhum atendimento encontrado com esses filtros.</td></tr>';
     };
 
     window.limparFiltros = function() {
@@ -742,7 +792,9 @@
       if(document.getElementById('fData')._flatpickr) document.getElementById('fData')._flatpickr.clear();
       if(document.getElementById('fDataInicio')._flatpickr) document.getElementById('fDataInicio')._flatpickr.clear();
       if(document.getElementById('fDataFim')._flatpickr) document.getElementById('fDataFim')._flatpickr.clear();
-      window.filtrarRelatorio();
+      
+      document.getElementById('contadorRelatorio').innerText = "Aplique um filtro acima para buscar";
+      document.getElementById('listaRelatorios').innerHTML = '';
     };
   </script>
 </body>
