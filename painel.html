@@ -16,6 +16,7 @@
   body { font-family: 'Montserrat', sans-serif; background-color: var(--fundo-bege); color: var(--texto-escuro); line-height: 1.6; }
   h1, h2, h3 { font-family: 'Playfair Display', serif; color: var(--roxo-escuro); }
 
+  /* TELA DE LOGIN */
   #tela-login { height: 100vh; display: flex; justify-content: center; align-items: center; background: linear-gradient(135deg, #3b2e45 0%, #2a282b 100%); }
   .login-box { background: var(--branco); padding: 40px 30px; border-radius: 20px; box-shadow: 0 20px 50px rgba(0,0,0,0.3); text-align: center; max-width: 400px; width: 90%; }
   .login-box h1 { margin-bottom: 10px; font-size: 2rem; }
@@ -26,6 +27,7 @@
   .btn-login:hover { background: var(--verde-escuro); }
   #erroLogin { color: var(--perigo); margin-top: 15px; font-size: 0.9rem; font-weight: bold; display: none; }
 
+  /* SISTEMA */
   #sistema { display: none; min-height: 100vh; }
   .sidebar { width: 260px; background: var(--roxo-escuro); color: var(--branco); height: 100vh; position: fixed; top: 0; left: 0; padding: 30px 20px; display: flex; flex-direction: column; gap: 10px; z-index: 100; }
   .sidebar h2 { color: var(--branco); font-size: 1.5rem; margin-bottom: 30px; text-align: center; }
@@ -66,6 +68,11 @@
   .btn-editar { background: transparent; border: 1px solid var(--alerta); color: #b5801f; }
   .btn-editar:hover { background: var(--alerta); color: white; }
   
+  /* Scroll na tabela de evoluções */
+  .table-scroll { max-height: 400px; overflow-y: auto; border: 1px solid #eee; border-radius: 8px; }
+  .table-scroll table { margin-top: 0; }
+  .table-scroll th { position: sticky; top: 0; z-index: 10; }
+
   .table-container { overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; margin-top: 10px; }
   th, td { padding: 15px; text-align: left; border-bottom: 1px solid #eee; }
@@ -146,6 +153,7 @@
         <div class="badge">Painel da Terapeuta</div>
       </div>
 
+      <!-- TELA: PACIENTES -->
       <div id="tela-pacientes" class="tela ativa no-print">
         <div class="card">
           <h3 id="tituloFormPaciente">Cadastrar Novo Paciente</h3>
@@ -186,6 +194,7 @@
         </div>
       </div>
 
+      <!-- TELA: AGENDA -->
       <div id="tela-agenda" class="tela no-print">
         <div class="card">
           <h3>Agendar Horário</h3>
@@ -208,6 +217,7 @@
         </div>
       </div>
 
+      <!-- TELA: EVOLUÇÃO -->
       <div id="tela-evolucao" class="tela no-print">
         <div class="card">
           <h3 id="tituloFormEvolucao">Registrar Evolução de Atendimento</h3>
@@ -230,9 +240,10 @@
             <div id="iaTexto" class="ia-texto"></div>
           </div>
         </div>
+        
         <div class="card">
-          <h3>Últimos Atendimentos Registrados (Mais recentes primeiro)</h3>
-          <div class="table-container">
+          <h3>Todos os Atendimentos Registrados (Mais antigos primeiro)</h3>
+          <div class="table-scroll">
             <table>
               <thead><tr><th>Data</th><th>Paciente</th><th>Descrição Original</th><th>Evolução (IA)</th><th>Ações</th></tr></thead>
               <tbody id="listaEvolucao"></tbody>
@@ -241,6 +252,7 @@
         </div>
       </div>
 
+      <!-- TELA: RELATÓRIOS -->
       <div id="tela-relatorios" class="tela">
         <div class="card no-print">
           <h3>Filtros de Relatório</h3>
@@ -286,7 +298,7 @@
     document.head.appendChild(scriptPt);
 
     const firebaseConfig = {
-      apiKey: "AIzaSyBWoie2zbgtkDyoeBCMiyEPy_sbuYMkJWU",
+      apiKey: "AIzaSyBWoIe2zbgtkDyoeBCMiyEPy_sbuYMkJWU",
       authDomain: "consultorio-livia-f0a6d.firebaseapp.com",
       projectId: "consultorio-livia-f0a6d",
       storageBucket: "consultorio-livia-f0a6d.firebasestorage.app",
@@ -559,6 +571,14 @@
       document.getElementById('btnCancelarEvolucao').style.display = "none";
     };
 
+    window.excluirEvolucao = async function(id) {
+      if (!confirm('Tem certeza que deseja EXCLUIR este atendimento permanentemente?')) return;
+      try {
+        await deleteDoc(doc(db, "evolucoes", id));
+        await carregarDados();
+      } catch(e) { alert("Erro ao excluir: " + e.message); }
+    };
+
     function processarTextoIA(textoOriginal) {
       let t = textoOriginal;
       const correcoes = [
@@ -592,7 +612,6 @@
       t = t.replace(/([.!?]\s+)([a-zà-ú])/g, (match, p1, p2) => p1 + p2.toUpperCase());
       if (t.length > 0) t = t.charAt(0).toLowerCase() + t.slice(1);
 
-      // PROMPT APLICADO: Texto único, corrido, técnico, sem marcadores.
       return `Durante a sessão de Terapia Ocupacional, o atendimento foi conduzido considerando as demandas sensoriais e motoras da criança. ${t} A intervenção estruturou-se a partir das atividades descritas, as quais atuaram como ferramentas para o aprimoramento do processamento sensorial, da modulação e do planejamento motor (praxia), em um ambiente terapêutico adequado para a expressão de respostas adaptativas. A partir da resposta da criança às propostas, observou-se engajamento nas tarefas e oportunidades de ganho em autorregulação e consciência corporal, recomendando-se a continuidade do plano terapêutico com foco na generalização das habilidades sensório-motoras para o cotidiano familiar e escolar.`;
     }
 
@@ -658,14 +677,19 @@
         return new Date(p[2], p[1]-1, p[0]);
       };
 
-      const evosRecentes = [...evolucoesGlobal].sort((a,b) => parseDate(b.data) - parseDate(a.data)).slice(0, 10);
-      document.getElementById('listaEvolucao').innerHTML = evosRecentes.map(e => `
+      // CORREÇÃO: Mostrando todos e do mais antigo para o mais novo na tabela de evolução
+      const evosOrdenadas = [...evolucoesGlobal].sort((a,b) => parseDate(a.data) - parseDate(b.data));
+      
+      document.getElementById('listaEvolucao').innerHTML = evosOrdenadas.map(e => `
         <tr>
           <td>${e.data}</td>
           <td>${e.pacienteNome}</td>
           <td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${e.descricao}">${e.descricao}</td>
-          <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color:var(--verde-escuro);" title="${e.descricaoIA}">${e.descricaoIA ? 'Ver prontuário' : 'Sem IA (Clique em Editar)'}</td>
-          <td><button class="btn btn-editar" style="padding:5px 10px; font-size:0.8rem;" onclick="editarEvolucao('${e.id}')">Editar</button></td>
+          <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color:var(--verde-escuro);" title="${e.descricaoIA}">${e.descricaoIA ? 'Ver prontuário' : 'Sem IA'}</td>
+          <td>
+            <button class="btn btn-editar" style="padding:5px 10px; font-size:0.8rem; margin-right:5px;" onclick="editarEvolucao('${e.id}')">Editar</button>
+            <button class="btn btn-perigo" style="padding:5px 10px; font-size:0.8rem;" onclick="excluirEvolucao('${e.id}')">Excluir</button>
+          </td>
         </tr>
       `).join('') || '<tr><td colspan="5">Nenhum atendimento registrado.</td></tr>';
       
@@ -699,6 +723,7 @@
         if (dtFim) { evolucoes = evolucoes.filter(e => parseDate(e.data) <= dtFim); }
       }
 
+      // Relatório mantém a ordem decrescente (mais novos primeiro) para facilitar leitura
       evolucoes.sort((a,b) => parseDate(b.data) - parseDate(a.data));
 
       document.getElementById('listaRelatorios').innerHTML = evolucoes.map(e => `
