@@ -121,7 +121,6 @@
 </head>
 <body>
 
-  <!-- TELA DE LOGIN -->
   <div id="tela-login">
     <div class="login-box">
       <h1>Área Restrita</h1>
@@ -133,7 +132,6 @@
     </div>
   </div>
 
-  <!-- SISTEMA -->
   <div id="sistema">
     <aside class="sidebar no-print">
       <h2>Livia Caroline</h2>
@@ -238,7 +236,7 @@
           </div>
         </div>
         <div class="card">
-          <h3>Últimos Atendimentos Registrados</h3>
+          <h3>Últimos Atendimentos Registrados (Mais recentes primeiro)</h3>
           <div class="table-container">
             <table>
               <thead><tr><th>Data</th><th>Paciente</th><th>Descrição Original</th><th>Evolução (IA)</th><th>Ações</th></tr></thead>
@@ -280,13 +278,11 @@
     </main>
   </div>
 
-  <!-- IMPORTAÇÕES FIREBASE E CALENDÁRIO -->
   <script type="module">
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
     
-    // Carrega o Flatpickr dinamicamente para não travar a página
     const scriptFlatpickr = document.createElement('script');
     scriptFlatpickr.src = "https://cdn.jsdelivr.net/npm/flatpickr";
     document.head.appendChild(scriptFlatpickr);
@@ -295,9 +291,8 @@
     scriptPt.src = "https://cdn.jsdelivr.net/npm/flatpickr/dist/l10n/pt.js";
     document.head.appendChild(scriptPt);
 
-    // SUAS CHAVES DO FIREBASE
     const firebaseConfig = {
-      apiKey: "AIzaSyBWoie2zbgtkDyoeBCMiyEPy_sbuYMkJWU",
+      apiKey: "AIzaSyBWoIe2zbgtkDyoeBCMiyEPy_sbuYMkJWU",
       authDomain: "consultorio-livia-f0a6d.firebaseapp.com",
       projectId: "consultorio-livia-f0a6d",
       storageBucket: "consultorio-livia-f0a6d.firebasestorage.app",
@@ -314,7 +309,6 @@
     let evolucoesGlobal = [];
     let configCalendario = {};
 
-    // Torna a função de login global para o botão conseguir chamar
     window.fazerLogin = async function() {
       const email = document.getElementById('emailInput').value;
       const senha = document.getElementById('senhaInput').value;
@@ -500,6 +494,7 @@
       catch(e) { alert(e.message); }
     };
 
+    // CORREÇÃO 1: Gerar IA automaticamente se estiver vazio ao abrir atendimentos antigos
     window.salvarEvolucao = async function() {
       const idEdicao = document.getElementById('eIdEdicao').value;
       const pacienteId = document.getElementById('ePaciente').value;
@@ -512,10 +507,16 @@
       const paciente = pacientesGlobal.find(p => p.id === pacienteId);
 
       try {
+        // Se não tem texto da IA, gera na hora
+        let textoFinalIA = descricaoIA;
+        if (!textoFinalIA || textoFinalIA.includes("Analisando")) {
+          textoFinalIA = processarTextoIA(descricao);
+        }
+
         if (idEdicao) {
-          await updateDoc(doc(db, "evolucoes", idEdicao), { pacienteId, pacienteNome: paciente.nome, data, descricao, descricaoIA });
+          await updateDoc(doc(db, "evolucoes", idEdicao), { pacienteId, pacienteNome: paciente.nome, data, descricao, descricaoIA: textoFinalIA });
         } else {
-          await addDoc(collection(db, "evolucoes"), { pacienteId, pacienteNome: paciente.nome, data, descricao, descricaoIA });
+          await addDoc(collection(db, "evolucoes"), { pacienteId, pacienteNome: paciente.nome, data, descricao, descricaoIA: textoFinalIA });
         }
         window.cancelarEdicaoEvolucao();
         alert('Evolução salva com sucesso!');
@@ -523,7 +524,7 @@
       } catch(e) { alert("Erro: " + e.message); }
     };
 
-    window.editarEvolucao = function(id) {
+    window.editarEvolucao = async function(id) {
       const e = evolucoesGlobal.find(e => e.id === id);
       if (!e) return;
       document.getElementById('eIdEdicao').value = e.id;
@@ -532,11 +533,20 @@
       if (document.getElementById('eData')._flatpickr) document.getElementById('eData')._flatpickr.setDate(e.data, false);
       document.getElementById('eDescricao').value = e.descricao;
       
-      if (e.descricaoIA) {
+      // CORREÇÃO 2: Se o antigo não tem IA, gera agora e atualiza no banco para não precisar gerar de novo
+      if (!e.descricaoIA) {
+        document.getElementById('iaTexto').innerText = "Gerando evolução automática...";
+        document.getElementById('iaResultado').classList.add('visivel');
+        
+        const textoGerado = processarTextoIA(e.descricao);
+        document.getElementById('iaTexto').innerText = textoGerado;
+        
+        // Atualiza silenciosamente no banco
+        await updateDoc(doc(db, "evolucoes", id), { descricaoIA: textoGerado });
+        e.descricaoIA = textoGerado; // atualiza na memória local
+      } else {
         document.getElementById('iaTexto').innerText = e.descricaoIA;
         document.getElementById('iaResultado').classList.add('visivel');
-      } else {
-        document.getElementById('iaResultado').classList.remove('visivel');
       }
       
       document.getElementById('tituloFormEvolucao').innerText = "Editar Evolução de Atendimento";
@@ -559,6 +569,51 @@
       document.getElementById('btnCancelarEvolucao').style.display = "none";
     };
 
+    // Função da IA separada para ser reutilizada
+    function processarTextoIA(textoOriginal) {
+      let t = textoOriginal;
+      const correcoes = [
+        { de: /\bnao\b/gi, para: "não" }, { de: /\bvoce\b/gi, para: "você" },
+        { de: /\btambem\b/gi, para: "também" }, { de: /\bagente\b/gi, para: "a gente" },
+        { de: /\bpobrema\b/gi, para: "problema" }, { de: /\bmenas\b/gi, para: "menos" },
+        { de: /\bconcerteza\b/gi, para: "com certeza" }, { de: /\bderrepente\b/gi, para: "de repente" },
+        { de: /\bexcessao\b/gi, para: "exceção" }, { de: /\bexelente\b/gi, para: "excelente" },
+        { de: /\bapos\b/gi, para: "após" }, { de: /\bja\b/gi, para: "já" },
+        { de: /\bso\b/gi, para: "só" }, { de: /\bate\b/gi, para: "até" },
+        { de: /brincamos/gi, para: "Foram propostas atividades lúdicas direcionadas a" },
+        { de: /trabalhamos/gi, para: "A intervenção foi focada em" },
+        { de: /ele ficou agitado/gi, para: "O paciente apresentou agitação psicomotora inicial" },
+        { de: /ela ficou agitada/gi, para: "A paciente apresentou agitação psicomotora inicial" },
+        { de: /melhorou/gi, para: "demonstrou evolução positiva no processo de regulação" },
+        { de: /equilíbrio/gi, para: "controle postural e equilíbrio dinâmico" },
+        { de: /balanço/gi, para: "equipamentos suspensos (estímulo vestibular)" },
+        { de: /massinha/gi, para: "massa de modelar (estímulo tátil e proprioceptivo)" },
+        { de: /texturas/gi, para: "exploração tátil de diferentes texturas" },
+        { de: /piscina de bolinhas/gi, para: "piscina de bolinhas (estímulo proprioceptivo por compressão)" },
+        { de: /pulou/gi, para: "realizou saltos (praxia global)" },
+        { de: /rolou/gi, para: "executou rolamentos (praxia global)" },
+        { de: /focou/gi, para: "sustentou a atenção por períodos mais longos" },
+        { de: /não quis/gi, para: "apresentou resistência inicial à proposta" },
+        { de: /gostou/gi, para: "aderiu positivamente à atividade" },
+        { de: /correu/gi, para: "vivenciou experiências de deslocamento e velocidade" },
+        { de: /circuito/gi, para: "circuito motor sequencial" },
+      ];
+      correcoes.forEach(c => { t = t.replace(c.de, c.para); });
+      t = t.replace(/\s+/g, ' ').trim();
+      t = t.replace(/([.!?]\s+)([a-zà-ú])/g, (match, p1, p2) => p1 + p2.toUpperCase());
+      if (t.length > 0) t = t.charAt(0).toUpperCase() + t.slice(1);
+
+      return `**RELATO DE EVOLUÇÃO - TERAPIA OCUPACIONAL**\n` +
+        `**Enfoque:** Integração Sensorial e Desenvolvimento Infantil\n\n` +
+        `**1. Perfil da Sessão e Acolhimento:**\n` +
+        `O atendimento foi conduzido considerando as demandas sensoriais e motoras da criança. ` +
+        `${t}\n\n` +
+        `**2. Objetivos e Conduta Terapêutica:**\n` +
+        `A intervenção estruturou-se a partir das atividades descritas, as quais atuaram como ferramentas para o aprimoramento do processamento sensorial, da modulação e/ou do planejamento motor (praxia). O ambiente terapêutico (sala sensorial) mostrou-se adequado para a expressão das respostas adaptativas esperadas.\n\n` +
+        `**3. Análise Clínica e Desempenho Ocupacional:**\n` +
+        `A partir da resposta da criança às propostas, observou-se engajamento nas tarefas e oportunidades de ganho em autorregulação e consciência corporal. Recomenda-se a continuidade do plano terapêutico, mantendo o foco na generalização das habilidades sensório-motoras adquiridas para o cotidiano familiar e escolar.`;
+    }
+
     window.gerarIA = function() {
       const textoOriginal = document.getElementById('eDescricao').value.trim();
       if (!textoOriginal) { alert('Escreva a descrição do atendimento primeiro.'); return; }
@@ -567,50 +622,7 @@
       document.getElementById('iaResultado').classList.add('visivel');
 
       setTimeout(() => {
-        let t = textoOriginal;
-        const correcoes = [
-          { de: /\bnao\b/gi, para: "não" }, { de: /\bvoce\b/gi, para: "você" },
-          { de: /\btambem\b/gi, para: "também" }, { de: /\bagente\b/gi, para: "a gente" },
-          { de: /\bpobrema\b/gi, para: "problema" }, { de: /\bmenas\b/gi, para: "menos" },
-          { de: /\bconcerteza\b/gi, para: "com certeza" }, { de: /\bderrepente\b/gi, para: "de repente" },
-          { de: /\bexcessao\b/gi, para: "exceção" }, { de: /\bexelente\b/gi, para: "excelente" },
-          { de: /\bapos\b/gi, para: "após" }, { de: /\bja\b/gi, para: "já" },
-          { de: /\bso\b/gi, para: "só" }, { de: /\bate\b/gi, para: "até" },
-          { de: /brincamos/gi, para: "Foram propostas atividades lúdicas direcionadas a" },
-          { de: /trabalhamos/gi, para: "A intervenção foi focada em" },
-          { de: /ele ficou agitado/gi, para: "O paciente apresentou agitação psicomotora inicial" },
-          { de: /ela ficou agitada/gi, para: "A paciente apresentou agitação psicomotora inicial" },
-          { de: /melhorou/gi, para: "demonstrou evolução positiva no processo de regulação" },
-          { de: /equilíbrio/gi, para: "controle postural e equilíbrio dinâmico" },
-          { de: /balanço/gi, para: "equipamentos suspensos (estímulo vestibular)" },
-          { de: /massinha/gi, para: "massa de modelar (estímulo tátil e proprioceptivo)" },
-          { de: /texturas/gi, para: "exploração tátil de diferentes texturas" },
-          { de: /piscina de bolinhas/gi, para: "piscina de bolinhas (estímulo proprioceptivo por compressão)" },
-          { de: /pulou/gi, para: "realizou saltos (praxia global)" },
-          { de: /rolou/gi, para: "executou rolamentos (praxia global)" },
-          { de: /focou/gi, para: "sustentou a atenção por períodos mais longos" },
-          { de: /não quis/gi, para: "apresentou resistência inicial à proposta" },
-          { de: /gostou/gi, para: "aderiu positivamente à atividade" },
-          { de: /correu/gi, para: "vivenciou experiências de deslocamento e velocidade" },
-          { de: /circuito/gi, para: "circuito motor sequencial" },
-        ];
-        correcoes.forEach(c => { t = t.replace(c.de, c.para); });
-        t = t.replace(/\s+/g, ' ').trim();
-        t = t.replace(/([.!?]\s+)([a-zà-ú])/g, (match, p1, p2) => p1 + p2.toUpperCase());
-        if (t.length > 0) t = t.charAt(0).toUpperCase() + t.slice(1);
-
-        const textoFinal = 
-          `**RELATO DE EVOLUÇÃO - TERAPIA OCUPACIONAL**\n` +
-          `**Enfoque:** Integração Sensorial e Desenvolvimento Infantil\n\n` +
-          `**1. Perfil da Sessão e Acolhimento:**\n` +
-          `O atendimento foi conduzido considerando as demandas sensoriais e motoras da criança. ` +
-          `${t}\n\n` +
-          `**2. Objetivos e Conduta Terapêutica:**\n` +
-          `A intervenção estruturou-se a partir das atividades descritas, as quais atuaram como ferramentas para o aprimoramento do processamento sensorial, da modulação e/ou do planejamento motor (praxia). O ambiente terapêutico (sala sensorial) mostrou-se adequado para a expressão das respostas adaptativas esperadas.\n\n` +
-          `**3. Análise Clínica e Desempenho Ocupacional:**\n` +
-          `A partir da resposta da criança às propostas, observou-se engajamento nas tarefas e oportunidades de ganho em autorregulação e consciência corporal. Recomenda-se a continuidade do plano terapêutico, mantendo o foco na generalização das habilidades sensório-motoras adquiridas para o cotidiano familiar e escolar.`;
-
-        document.getElementById('iaTexto').innerText = textoFinal;
+        document.getElementById('iaTexto').innerText = processarTextoIA(textoOriginal);
       }, 1500);
     };
 
@@ -658,13 +670,20 @@
         </tr>
       `).join('') || '<tr><td colspan="5">Nenhum agendamento futuro.</td></tr>';
 
-      const evosRecentes = [...evolucoesGlobal].reverse().slice(0, 10);
+      // CORREÇÃO 3: Ordenar do mais novo para o mais antigo na tabela
+      const parseDate = (d) => {
+        if(!d) return new Date(0);
+        const p = d.split('/');
+        return new Date(p[2], p[1]-1, p[0]);
+      };
+
+      const evosRecentes = [...evolucoesGlobal].sort((a,b) => parseDate(b.data) - parseDate(a.data)).slice(0, 10);
       document.getElementById('listaEvolucao').innerHTML = evosRecentes.map(e => `
         <tr>
           <td>${e.data}</td>
           <td>${e.pacienteNome}</td>
           <td style="max-width: 150px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;" title="${e.descricao}">${e.descricao}</td>
-          <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color:var(--verde-escuro);" title="${e.descricaoIA}">${e.descricaoIA ? 'Ver prontuário estruturado' : 'Não gerado'}</td>
+          <td style="max-width: 200px; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; color:var(--verde-escuro);" title="${e.descricaoIA}">${e.descricaoIA ? 'Ver prontuário' : 'Sem IA (Clique em Editar)'}</td>
           <td><button class="btn btn-editar" style="padding:5px 10px; font-size:0.8rem;" onclick="editarEvolucao('${e.id}')">Editar</button></td>
         </tr>
       `).join('') || '<tr><td colspan="5">Nenhum atendimento registrado.</td></tr>';
@@ -701,11 +720,14 @@
 
       evolucoes.sort((a,b) => parseDate(b.data) - parseDate(a.data));
 
+      // CORREÇÃO 4: Tabela do relatório exibe a Evolução da IA completa, sem cortes (estilo bloco)
       document.getElementById('listaRelatorios').innerHTML = evolucoes.map(e => `
         <tr>
-          <td style="white-space: nowrap; vertical-align: top;">${e.data}</td>
+          <td style="white-space: nowrap; vertical-align: top; font-weight: 600;">${e.data}</td>
           <td style="white-space: nowrap; vertical-align: top;"><strong>${e.pacienteNome}</strong></td>
-          <td style="font-size: 0.85rem; line-height: 1.5;">${(e.descricaoIA || e.descricao).replace(/\n/g, '<br>')}</td>
+          <td style="font-size: 0.9rem; line-height: 1.6; padding: 15px;">
+            ${e.descricaoIA ? e.descricaoIA.replace(/\n/g, '<br>') : '<em style="color:#888;">Evolução não gerada (abra a Evolução e clique em Editar).</em>'}
+          </td>
         </tr>
       `).join('') || '<tr><td colspan="3">Nenhum atendimento encontrado.</td></tr>';
     };
