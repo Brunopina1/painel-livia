@@ -68,10 +68,6 @@
   .btn-editar { background: transparent; border: 1px solid var(--alerta); color: #b5801f; }
   .btn-editar:hover { background: var(--alerta); color: white; }
   
-  .table-scroll { max-height: 450px; overflow-y: auto; border: 1px solid #eee; border-radius: 8px; margin-top: 15px; }
-  .table-scroll table { margin-top: 0; }
-  .table-scroll th { position: sticky; top: 0; z-index: 10; }
-
   .table-container { overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; margin-top: 10px; }
   th, td { padding: 15px; text-align: left; border-bottom: 1px solid #eee; }
@@ -90,8 +86,8 @@
   .header-titulo h2 { font-size: 1.2rem; margin-bottom: 2px; }
   .header-titulo p { font-size: 0.8rem; color: var(--texto-claro); }
 
-  /* CONTADOR DE RESULTADOS */
   .contador-box { background: var(--verde-claro); color: var(--verde-escuro); padding: 10px 15px; border-radius: 8px; font-weight: 600; font-size: 0.95rem; margin-bottom: 15px; display: inline-block; border-left: 4px solid var(--verde-salvia); }
+  .paginacao { display: flex; justify-content: space-between; align-items: center; margin-top: 15px; padding-top: 15px; border-top: 1px solid #eee; }
 
   .flatpickr-calendar { font-family: 'Montserrat', sans-serif; box-shadow: 0 10px 30px rgba(0,0,0,0.1); border-radius: 10px; }
   .flatpickr-day.selected { background: var(--verde-salvia); border-color: var(--verde-salvia); }
@@ -243,20 +239,34 @@
           </div>
         </div>
         
+        <!-- BUSCA DE EVOLUÇÕES -->
         <div class="card">
-          <h3>Histórico de Atendimentos</h3>
-          <div class="row" style="margin-bottom: 15px;">
-            <div class="form-group" style="margin-bottom: 0;">
-              <input type="text" id="buscaEvolucao" class="form-control" placeholder="🔍 Digite o nome do paciente para buscar..." onkeyup="renderizarHistorico()">
-            </div>
+          <h3>Buscar Atendimentos para Editar/Excluir</h3>
+          <div class="row-4" style="margin-bottom: 15px;">
+            <div class="form-group" style="margin-bottom: 0;"><label>Paciente</label><select id="buscaPaciente" class="form-control"><option value="">Todos</option></select></div>
+            <div class="form-group" style="margin-bottom: 0;"><label>Data Exata</label><input type="text" id="buscaData" class="form-control" placeholder="Data exata"></div>
+            <div class="form-group" style="margin-bottom: 0;"><label>Data Início</label><input type="text" id="buscaDataIni" class="form-control" placeholder="Data início"></div>
+            <div class="form-group" style="margin-bottom: 0;"><label>Data Fim</label><input type="text" id="buscaDataFim" class="form-control" placeholder="Data fim"></div>
           </div>
-          <div class="contador-box" id="contadorHistorico">Mostrando todos os atendimentos</div>
+          <div style="display: flex; gap: 10px;">
+            <button class="btn" onclick="buscarEvolucoes(1)">🔍 Pesquisar</button>
+            <button class="btn btn-outline" onclick="limparBuscaEvolucoes()">Limpar</button>
+          </div>
           
-          <div class="table-scroll">
-            <table>
-              <thead><tr><th>Data</th><th>Paciente</th><th>Descrição Original</th><th>Evolução (IA)</th><th>Ações</th></tr></thead>
-              <tbody id="listaEvolucao"></tbody>
-            </table>
+          <div style="margin-top: 20px;">
+            <div class="contador-box" id="contadorBusca">Clique em pesquisar para carregar os atendimentos.</div>
+            <div class="table-container">
+              <table>
+                <thead><tr><th>Data</th><th>Paciente</th><th>Descrição Original</th><th>Evolução (IA)</th><th>Ações</th></tr></thead>
+                <tbody id="listaEvolucao"></tbody>
+              </table>
+            </div>
+            <!-- PAGINAÇÃO -->
+            <div class="paginacao no-print" id="paginacaoEvolucoes" style="display: none;">
+              <button class="btn btn-outline" id="btnPagAnterior" onclick="mudarPaginaEvolucao(-1)">« Anterior</button>
+              <span id="infoPagina" style="font-weight: 600; color: var(--texto-claro);"></span>
+              <button class="btn btn-outline" id="btnPagProxima" onclick="mudarPaginaEvolucao(1)">Próxima »</button>
+            </div>
           </div>
         </div>
       </div>
@@ -311,7 +321,7 @@
     document.head.appendChild(scriptPt);
 
     const firebaseConfig = {
-      apiKey: "AIzaSyBWoie2zbgtkDyoeBCMiyEPy_sbuYMkJWU",
+      apiKey: "AIzaSyBWoIe2zbgtkDyoeBCMiyEPy_sbuYMkJWU",
       authDomain: "consultorio-livia-f0a6d.firebaseapp.com",
       projectId: "consultorio-livia-f0a6d",
       storageBucket: "consultorio-livia-f0a6d.firebasestorage.app",
@@ -327,6 +337,11 @@
     let agendaGlobal = [];
     let evolucoesGlobal = [];
     let configCalendario = {};
+    
+    // Variáveis de Paginação e Busca
+    let resultadosBuscaEvolucao = [];
+    let paginaAtualEvolucao = 1;
+    const ITENS_POR_PAGINA = 20;
 
     window.fazerLogin = async function() {
       const email = document.getElementById('emailInput').value;
@@ -374,6 +389,11 @@
         flatpickr("#fDataInicio", { ...configCalendario, maxDate: null });
         flatpickr("#fDataFim", { ...configCalendario, maxDate: null });
         flatpickr("#aData", { ...configCalendario, minDate: "today" });
+        
+        // Calendários da busca de evolução
+        flatpickr("#buscaData", { ...configCalendario, maxDate: null });
+        flatpickr("#buscaDataIni", { ...configCalendario, maxDate: null });
+        flatpickr("#buscaDataFim", { ...configCalendario, maxDate: null });
       }, 500);
 
       await carregarDados();
@@ -400,8 +420,6 @@
       elementoMenu.classList.add('ativo');
       const titulos = { 'pacientes': 'Gestão de Pacientes', 'agenda': 'Agenda de Horários', 'evolucao': 'Evolução de Atendimento', 'relatorios': 'Relatórios e Prontuários' };
       document.getElementById('tituloTela').innerText = titulos[idTela];
-      
-      if(idTela === 'evolucao') renderizarHistorico();
     };
 
     window.calcularIdade = function(dataStr) {
@@ -540,6 +558,10 @@
         window.cancelarEdicaoEvolucao();
         alert('Evolução salva com sucesso!');
         await carregarDados();
+        
+        // Se houver busca ativa, atualiza os resultados
+        if(resultadosBuscaEvolucao.length > 0) buscarEvolucoes(paginaAtualEvolucao);
+        
       } catch(e) { alert("Erro: " + e.message); }
     };
 
@@ -591,10 +613,15 @@
       try {
         await deleteDoc(doc(db, "evolucoes", id));
         await carregarDados();
+        
+        // Se houver busca ativa, atualiza os resultados
+        if(resultadosBuscaEvolucao.length > 0) buscarEvolucoes(paginaAtualEvolucao);
       } catch(e) { alert("Erro ao excluir: " + e.message); }
     };
 
+    /* ================= PROMPT DA IA (SIMULAÇÃO) ================= */
     function processarTextoIA(textoOriginal) {
+      // 1. Correções básicas
       let t = textoOriginal;
       const correcoes = [
         { de: /\bnao\b/gi, para: "não" }, { de: /\bvoce\b/gi, para: "você" },
@@ -623,11 +650,21 @@
         { de: /circuito/gi, para: "circuito motor sequencial" },
       ];
       correcoes.forEach(c => { t = t.replace(c.de, c.para); });
+
+      // Limpa o texto e garante a primeira letra maiúscula
       t = t.replace(/\s+/g, ' ').trim();
       t = t.replace(/([.!?]\s+)([a-zà-ú])/g, (match, p1, p2) => p1 + p2.toUpperCase());
-      if (t.length > 0) t = t.charAt(0).toLowerCase() + t.slice(1);
+      if (t.length > 0) t = t.charAt(0).toUpperCase() + t.slice(1);
 
-      return `Durante a sessão de Terapia Ocupacional, o atendimento foi conduzido considerando as demandas sensoriais e motoras da criança. ${t} A intervenção estruturou-se a partir das atividades descritas, as quais atuaram como ferramentas para o aprimoramento do processamento sensorial, da modulação e do planejamento motor (praxia), em um ambiente terapêutico adequado para a expressão de respostas adaptativas. A partir da resposta da criança às propostas, observou-se engajamento nas tarefas e oportunidades de ganho em autorregulação e consciência corporal, recomendando-se a continuidade do plano terapêutico com foco na generalização das habilidades sensório-motoras para o cotidiano familiar e escolar.`;
+      // 2. Estruturação (Simulando o Gemini com o prompt passado)
+      const introducao = `A sessão de Terapia Ocupacional foi conduzida com o objetivo de intervir nas demandas observadas, estruturando-se a partir da seguinte descrição clínica: `;
+      
+      const conexao = ` Durante a intervenção, a criança foi exposta a atividades que visaram o aprimoramento do processamento sensorial, modulação e planejamento motor no ambiente terapêutico.`;
+      
+      const conclusao = ` A partir da análise do engajamento e das respostas adaptativas apresentadas, conclui-se que as metas propostas foram trabalhadas conforme o planejado, evidenciando oportunidades de ganho em autorregulação e consciência corporal. Recomenda-se a continuidade do plano terapêutico, focando na generalização dessas habilidades para o cotidiano familiar e escolar.`;
+
+      // Retorna o texto único, corrido, sem frases prontas repetitivas e sem marcadores
+      return `${introducao}${t}${conexao}${conclusao}`;
     }
 
     window.gerarIA = function() {
@@ -642,39 +679,54 @@
       }, 1500);
     };
 
-    function carregarSelects() {
-      let options = '<option value="">Selecione um paciente</option>';
-      pacientesGlobal.forEach(p => { options += `<option value="${p.id}">${p.nome}</option>`; });
-      
-      document.getElementById('aPaciente').innerHTML = options;
-      document.getElementById('ePaciente').innerHTML = options;
-      
-      let filtroOptions = '<option value="">Todos os Pacientes</option>';
-      pacientesGlobal.forEach(p => { filtroOptions += `<option value="${p.id}">${p.nome}</option>`; });
-      document.getElementById('fPaciente').innerHTML = filtroOptions;
-    }
+    /* ================= BUSCA DE EVOLUÇÕES E PAGINAÇÃO ================= */
+    window.buscarEvolucoes = function(pagina = 1) {
+      const fPac = document.getElementById('buscaPaciente').value;
+      const fDataExata = document.getElementById('buscaData').value;
+      const fDataIni = document.getElementById('buscaDataIni').value;
+      const fDataFim = document.getElementById('buscaDataFim').value;
 
-    // FUNÇÃO NOVA PARA O HISTÓRICO COM BUSCA
-    window.renderizarHistorico = function() {
-      const termo = document.getElementById('buscaEvolucao').value.toLowerCase().trim();
+      let evolucoes = [...evolucoesGlobal];
+
+      if (fPac) { evolucoes = evolucoes.filter(e => e.pacienteId === fPac); }
+      
       const parseDate = (d) => {
-        if(!d) return new Date(0);
+        if(!d) return null;
         const p = d.split('/');
         return new Date(p[2], p[1]-1, p[0]);
       };
 
-      let filtradas = [...evolucoesGlobal].sort((a,b) => parseDate(a.data) - parseDate(b.data));
+      const dtExata = parseDate(fDataExata);
+      const dtIni = parseDate(fDataIni);
+      const dtFim = parseDate(fDataFim);
 
-      if (termo) {
-        filtradas = filtradas.filter(e => e.pacienteNome.toLowerCase().includes(termo));
+      if (dtExata) {
+        evolucoes = evolucoes.filter(e => parseDate(e.data).getTime() === dtExata.getTime());
+      } else {
+        if (dtIni) { evolucoes = evolucoes.filter(e => parseDate(e.data) >= dtIni); }
+        if (dtFim) { evolucoes = evolucoes.filter(e => parseDate(e.data) <= dtFim); }
       }
 
-      // Mostra no máximo 15 resultados se não estiver buscando
-      if (!termo && filtradas.length > 15) {
-        filtradas = filtradas.slice(0, 15);
-      }
+      // Ordena do mais novo para o mais antigo
+      evolucoes.sort((a,b) => parseDate(b.data) - parseDate(a.data));
+      
+      resultadosBuscaEvolucao = evolucoes;
+      paginaAtualEvolucao = pagina;
+      
+      renderizarPaginaEvolucao();
+    };
 
-      document.getElementById('listaEvolucao').innerHTML = filtradas.map(e => `
+    function renderizarPaginaEvolucao() {
+      const totalItens = resultadosBuscaEvolucao.length;
+      const totalPaginas = Math.ceil(totalItens / ITENS_POR_PAGINA);
+      
+      const inicio = (paginaAtualEvolucao - 1) * ITENS_POR_PAGINA;
+      const fim = inicio + ITENS_POR_PAGINA;
+      const itensPagina = resultadosBuscaEvolucao.slice(inicio, fim);
+
+      document.getElementById('contadorBusca').innerText = `Encontrados: ${totalItens} atendimento(s)`;
+
+      document.getElementById('listaEvolucao').innerHTML = itensPagina.map(e => `
         <tr>
           <td>${e.data}</td>
           <td>${e.pacienteNome}</td>
@@ -685,15 +737,49 @@
             <button class="btn btn-perigo" style="padding:5px 10px; font-size:0.8rem;" onclick="excluirEvolucao('${e.id}')">Excluir</button>
           </td>
         </tr>
-      `).join('') || '<tr><td colspan="5" style="text-align: center; color: #888;">Nenhum atendimento encontrado.</td></tr>';
+      `).join('') || '<tr><td colspan="5" style="text-align: center; color: #888;">Nenhum atendimento encontrado com esses filtros.</td></tr>';
       
-      const countBox = document.getElementById('contadorHistorico');
-      if (termo) {
-        countBox.innerText = `Exibindo ${filtradas.length} atendimento(s) encontrados para "${termo}"`;
+      const pagDiv = document.getElementById('paginacaoEvolucoes');
+      if (totalPaginas > 1) {
+        pagDiv.style.display = 'flex';
+        document.getElementById('infoPagina').innerText = `Página ${paginaAtualEvolucao} de ${totalPaginas}`;
+        document.getElementById('btnPagAnterior').disabled = paginaAtualEvolucao === 1;
+        document.getElementById('btnPagProxima').disabled = paginaAtualEvolucao === totalPaginas;
       } else {
-        countBox.innerText = `Exibindo os 15 últimos atendimentos (use a busca para filtrar)`;
+        pagDiv.style.display = 'none';
       }
+    }
+
+    window.mudarPaginaEvolucao = function(direcao) {
+      paginaAtualEvolucao += direcao;
+      renderizarPaginaEvolucao();
     };
+
+    window.limparBuscaEvolucoes = function() {
+      document.getElementById('buscaPaciente').value = '';
+      if(document.getElementById('buscaData')._flatpickr) document.getElementById('buscaData')._flatpickr.clear();
+      if(document.getElementById('buscaDataIni')._flatpickr) document.getElementById('buscaDataIni')._flatpickr.clear();
+      if(document.getElementById('buscaDataFim')._flatpickr) document.getElementById('buscaDataFim')._flatpickr.clear();
+      
+      resultadosBuscaEvolucao = [];
+      document.getElementById('listaEvolucao').innerHTML = '';
+      document.getElementById('contadorBusca').innerText = "Clique em pesquisar para carregar os atendimentos.";
+      document.getElementById('paginacaoEvolucoes').style.display = 'none';
+    };
+
+    /* ================= FILTROS DO RELATÓRIO ================= */
+    function carregarSelects() {
+      let options = '<option value="">Selecione um paciente</option>';
+      pacientesGlobal.forEach(p => { options += `<option value="${p.id}">${p.nome}</option>`; });
+      
+      document.getElementById('aPaciente').innerHTML = options;
+      document.getElementById('ePaciente').innerHTML = options;
+      document.getElementById('buscaPaciente').innerHTML = '<option value="">Todos os Pacientes</option>' + options;
+      
+      let filtroOptions = '<option value="">Todos os Pacientes</option>';
+      pacientesGlobal.forEach(p => { filtroOptions += `<option value="${p.id}">${p.nome}</option>`; });
+      document.getElementById('fPaciente').innerHTML = filtroOptions;
+    }
 
     function renderizarTudo() {
       document.getElementById('listaPacientes').innerHTML = pacientesGlobal.map(p => {
@@ -726,13 +812,6 @@
           <td><button class="btn btn-perigo" style="padding:5px 10px; font-size:0.8rem;" onclick="excluirAgenda('${a.id}')">Cancelar</button></td>
         </tr>
       `).join('') || '<tr><td colspan="5">Nenhum agendamento futuro.</td></tr>';
-
-      window.renderizarHistorico(); // Chama a nova função de histórico
-      
-      // Se a tela de relatório já estiver aberta, mantém o resultado
-      if(document.getElementById('tela-relatorios').classList.contains('ativa')) {
-         window.filtrarRelatorio();
-      }
     }
 
     window.filtrarRelatorio = function() {
@@ -769,7 +848,6 @@
         if (dtFim) { evolucoes = evolucoes.filter(e => parseDate(e.data) <= dtFim); }
       }
 
-      // Relatório mantém a ordem decrescente (mais novos primeiro)
       evolucoes.sort((a,b) => parseDate(b.data) - parseDate(a.data));
 
       const countBox = document.getElementById('contadorRelatorio');
