@@ -318,7 +318,7 @@
 
     // CHAVE DO FIREBASE
     const firebaseConfig = {
-      apiKey: "AIzaSyBWoie2zbgtkDyoeBCMiyEPy_sbuYMkJWU",
+      apiKey: "AIzaSyBWoIe2zbgtkDyoeBCMiyEPy_sbuYMkJWU",
       authDomain: "consultorio-livia-f0a6d.firebaseapp.com",
       projectId: "consultorio-livia-f0a6d",
       storageBucket: "consultorio-livia-f0a6d.firebasestorage.app",
@@ -602,8 +602,8 @@
       document.getElementById('iaTexto').innerText = "Analisando relato e estruturando prontuário clínico...";
       document.getElementById('iaResultado').classList.add('visivel');
 
-      const GEMINI_API_KEY = "AQ.Ab8RN6LmsU8663TjMnX65BMZ1B2s6koG3CfspV9O5CfLW_KAdg";
-      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent`;
+      const GEMINI_API_KEY = "AQ.Ab8RN6KL8J7m_gXRO9hMrukVlqGKgjbQ3e0Py01gPCdsoLAXOQ";
+      const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${GEMINI_API_KEY}`;
 
       const promptSistema = `Você é uma inteligência artificial especialista em Terapia Ocupacional Infantil e atua como revisora e editora clínica sênior. Sua única tarefa é ler o relato corrido enviado pelo terapeuta e transformá-lo em uma evolução clínica formal, unificada e integrada. O resultado final deve ser redigido em formato de TEXTO ÚNICO E CORRIDO (parágrafo clínico contínuo), sem tópicos, sem marcadores de listas e sem divisões de itens de análise. A escrita deve ser fluida, clara, altamente profissional e bem embasada para ser apresentada a famílias, médicos e escolas.
       
@@ -618,10 +618,7 @@
       try {
         const response = await fetch(url, {
           method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'x-goog-api-key': GEMINI_API_KEY
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ parts: [{ text: promptSistema }] }]
           })
