@@ -11,18 +11,59 @@ export async function POST(request) {
       );
     }
 
-    const response = await fetch(
+    // 1. Consulta os modelos exatamente liberados para esta chave
+    const listRes = await fetch(
       'https://googleapis.com',
+      { headers: { 'x-goog-api-key': apiKey } }
+    );
+
+    const listText = await listRes.text();
+    let listData;
+    try {
+      listData = JSON.parse(listText);
+    } catch {
+      return Response.json(
+        { error: `Chave rejeitada pelo endpoint AI Studio (HTTP ${listRes.status}). Use uma chave criada no Google AI Studio (://google.com).` },
+        { status: 502 }
+      );
+    }
+
+    if (!listRes.ok) {
+      return Response.json(
+        { error: listData.error?.message || `Erro HTTP ${listRes.status} ao listar modelos` },
+        { status: listRes.status }
+      );
+    }
+
+    // 2. Filtra apenas modelos que suportam generateContent
+    const modelosDisponiveis = (listData.models || [])
+      .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
+      .map(m => m.name); // ex: "models/gemini-3.8-flash"
+
+    if (modelosDisponiveis.length === 0) {
+      return Response.json(
+        { error: 'Nenhum modelo generateContent habilitado nesta chave.' },
+        { status: 404 }
+      );
+    }
+
+    // Prioriza modelos flash mais recentes disponíveis na conta
+    const modeloEscolhido =
+      modelosDisponiveis.find(n => n.includes('3.8-flash')) ||
+      modelosDisponiveis.find(n => n.includes('flash')) ||
+      modelosDisponiveis;
+
+    // 3. Gera o texto usando o modelo exato confirmado pela conta
+    const response = await fetch(
+      `https://googleapis.com{modeloEscolhido}:generateContent`,
       {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-goog-api-key': apiKey,
-          'Api-Revision': '2026-05-20'
+          'x-goog-api-key': apiKey
         },
         body: JSON.stringify({
-          model: 'gemini-3.8-flash',
-          input: prompt
+          contents: [{ parts: [{ text: prompt }] }]
         })
       }
     );
@@ -33,33 +74,19 @@ export async function POST(request) {
       data = JSON.parse(textoBruto);
     } catch {
       return Response.json(
-        { error: `Resposta inválida do Google (HTTP ${response.status}): ${textoBruto.slice(0, 150)}` },
+        { error: `Erro no modelo ${modeloEscolhido} (HTTP ${response.status}). Modelos da sua conta: ${modelosDisponiveis.join(', ')}` },
         { status: 502 }
       );
     }
 
     if (!response.ok) {
       return Response.json(
-        { error: data.error?.message || `Erro HTTP ${response.status} no Google Gemini` },
+        { error: `[${modeloEscolhido}] ${data.error?.message || response.status} | Disponíveis: ${modelosDisponiveis.join(', ')}` },
         { status: response.status }
       );
     }
 
-    const stepSaida = (data.steps || []).find(s => s.type === 'model_output');
-    const blocoTexto = (stepSaida?.content || []).find(c => c.type === 'text');
-    const textoGerado = blocoTexto?.text || data.output_text || '';
-
-    if (!textoGerado) {
-      return Response.json(
-        { error: 'O Google respondeu sem texto gerado: ' + JSON.stringify(data).slice(0, 150) },
-        { status: 502 }
-      );
-    }
-
-    return Response.json(
-      { candidates: [{ content: { parts: [{ text: textoGerado }] } }] },
-      { status: 200 }
-    );
+    return Response.json(data, { status: 200 });
   } catch (error) {
     return Response.json(
       { error: 'Falha interna na função: ' + error.message },
