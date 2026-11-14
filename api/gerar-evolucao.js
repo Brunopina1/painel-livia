@@ -17,10 +17,12 @@ export async function POST(request) {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
-          'x-goog-api-key': apiKey
+          'x-goog-api-key': apiKey,
+          'Api-Revision': '2026-05-20'
         },
         body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }]
+          model: 'gemini-3.8-flash',
+          input: prompt
         })
       }
     );
@@ -43,7 +45,21 @@ export async function POST(request) {
       );
     }
 
-    return Response.json(data, { status: 200 });
+    const stepSaida = (data.steps || []).find(s => s.type === 'model_output');
+    const blocoTexto = (stepSaida?.content || []).find(c => c.type === 'text');
+    const textoGerado = blocoTexto?.text || data.output_text || '';
+
+    if (!textoGerado) {
+      return Response.json(
+        { error: 'O Google respondeu sem texto gerado: ' + JSON.stringify(data).slice(0, 150) },
+        { status: 502 }
+      );
+    }
+
+    return Response.json(
+      { candidates: [{ content: { parts: [{ text: textoGerado }] } }] },
+      { status: 200 }
+    );
   } catch (error) {
     return Response.json(
       { error: 'Falha interna na função: ' + error.message },
