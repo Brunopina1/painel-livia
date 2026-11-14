@@ -11,7 +11,7 @@ export async function POST(request) {
       );
     }
 
-    // 1. Tenta primeiro a Interactions API oficial (modelo gemini-4-hydrogen da documentação)
+    // 1. Tenta primeiro a Interactions API oficial (modelo gemini-4-hydrogen)
     const intRes = await fetch(
       'https://googleapis.com',
       {
@@ -67,7 +67,7 @@ export async function POST(request) {
       let data = null;
       try { data = JSON.parse(raw); } catch {}
 
-      if (res.ok && data?.candidates?.?.content?.parts?.?.text) {
+      if (res.ok && data?.candidates?.[0]?.content?.parts?.[0]?.text) {
         return Response.json(data, { status: 200 });
       }
 
