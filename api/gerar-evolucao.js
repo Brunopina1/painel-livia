@@ -1,3 +1,5 @@
+import { GoogleGenAI } from 'https://esm.sh';
+
 export async function POST(request) {
   try {
     const body = await request.json();
@@ -11,85 +13,30 @@ export async function POST(request) {
       );
     }
 
-    // 1. Consulta os modelos exatamente liberados para esta chave
-    const listRes = await fetch(
-      'https://googleapis.com',
-      { headers: { 'x-goog-api-key': apiKey } }
-    );
+    const ai = new GoogleGenAI({ apiKey });
 
-    const listText = await listRes.text();
-    let listData;
-    try {
-      listData = JSON.parse(listText);
-    } catch {
+    // Usa a Interactions API oficial recomendada pelo Google para chaves AQ.
+    const interaction = await ai.interactions.create({
+      model: 'gemini-3.8-flash',
+      input: prompt
+    });
+
+    const textoGerado = interaction.output_text;
+
+    if (!textoGerado) {
       return Response.json(
-        { error: `Chave rejeitada pelo endpoint AI Studio (HTTP ${listRes.status}). Use uma chave criada no Google AI Studio (://google.com).` },
+        { error: 'Resposta sem texto: ' + JSON.stringify(interaction).slice(0, 150) },
         { status: 502 }
       );
     }
 
-    if (!listRes.ok) {
-      return Response.json(
-        { error: listData.error?.message || `Erro HTTP ${listRes.status} ao listar modelos` },
-        { status: listRes.status }
-      );
-    }
-
-    // 2. Filtra apenas modelos que suportam generateContent
-    const modelosDisponiveis = (listData.models || [])
-      .filter(m => (m.supportedGenerationMethods || []).includes('generateContent'))
-      .map(m => m.name); // ex: "models/gemini-3.8-flash"
-
-    if (modelosDisponiveis.length === 0) {
-      return Response.json(
-        { error: 'Nenhum modelo generateContent habilitado nesta chave.' },
-        { status: 404 }
-      );
-    }
-
-    // Prioriza modelos flash mais recentes disponíveis na conta
-    const modeloEscolhido =
-      modelosDisponiveis.find(n => n.includes('3.8-flash')) ||
-      modelosDisponiveis.find(n => n.includes('flash')) ||
-      modelosDisponiveis;
-
-    // 3. Gera o texto usando o modelo exato confirmado pela conta
-    const response = await fetch(
-      `https://googleapis.com{modeloEscolhido}:generateContent`,
-      {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': apiKey
-        },
-        body: JSON.stringify({
-          contents: [{ parts: [{ text: prompt }] }]
-        })
-      }
+    return Response.json(
+      { candidates: [{ content: { parts: [{ text: textoGerado }] } }] },
+      { status: 200 }
     );
-
-    const textoBruto = await response.text();
-    let data;
-    try {
-      data = JSON.parse(textoBruto);
-    } catch {
-      return Response.json(
-        { error: `Erro no modelo ${modeloEscolhido} (HTTP ${response.status}). Modelos da sua conta: ${modelosDisponiveis.join(', ')}` },
-        { status: 502 }
-      );
-    }
-
-    if (!response.ok) {
-      return Response.json(
-        { error: `[${modeloEscolhido}] ${data.error?.message || response.status} | Disponíveis: ${modelosDisponiveis.join(', ')}` },
-        { status: response.status }
-      );
-    }
-
-    return Response.json(data, { status: 200 });
   } catch (error) {
     return Response.json(
-      { error: 'Falha interna na função: ' + error.message },
+      { error: 'Erro SDK Gemini: ' + (error.message || String(error)) },
       { status: 500 }
     );
   }
