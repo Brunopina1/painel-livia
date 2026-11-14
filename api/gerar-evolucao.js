@@ -11,21 +11,14 @@ export async function POST(request) {
       );
     }
 
-    const headers = {
-      'Content-Type': 'application/json'
-    };
-
-    if (apiKey.startsWith('AQ.')) {
-      headers['Authorization'] = `Bearer ${apiKey}`;
-    } else {
-      headers['x-goog-api-key'] = apiKey;
-    }
-
     const response = await fetch(
-      'https://googleapis.com',
+      'https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent',
       {
         method: 'POST',
-        headers,
+        headers: {
+          'Content-Type': 'application/json',
+          'x-goog-api-key': apiKey
+        },
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }]
         })
