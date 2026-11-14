@@ -635,39 +635,6 @@
     };
 
 
-
-      const promptSistema = `Você é uma inteligência artificial especialista em Terapia Ocupacional Infantil e atua como revisora e editora clínica sênior. Sua única tarefa é ler o relato corrido enviado pelo terapeuta e transformá-lo em uma evolução clínica formal, unificada e integrada. O resultado final deve ser redigido em formato de TEXTO ÚNICO E CORRIDO (parágrafo clínico contínuo), sem tópicos, sem marcadores de listas e sem divisões de itens de análise. A escrita deve ser fluida, clara, altamente profissional e bem embasada para ser apresentada a famílias, médicos e escolas.
-      
-      REGRAS CRUZAIS DE SEGURANÇA E PRECISÃO:
-      1. PROIBIDO INVENTAR OU ALUCINAR: Não adicionar diagnósticos, comportamentos, condutas ou atividades que não tenham sido descritos expressamente pelo terapeuta no texto original.
-      2. ENGENHARIA DE LINGUAGEM: Seu papel é traduzir o rascunho corrido para uma redação formal, técnica e coesa da Terapia Ocupacional (abordando aspectos motores, processamento sensorial e engajamento geral no mesmo parágrafo), corrigindo pontuação e concordância.
-      3. Não utilize saudações, introduções ou notas de rodapé. Devolva apenas o parágrafo da evolução pronta.
-      
-      Relato do Terapeuta:
-      "${textoOriginal}"`;
-
-      try {
-        const response = await fetch('/api/gerar-evolucao', {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({ prompt: promptSistema })
-        });
-
-        const data = await response.json();
-
-        if (!response.ok) {
-          const msgErro = data.error?.message || `Status ${response.status}`;
-          throw new Error(msgErro);
-        }
-
-        const textoGerado = data.candidates[0].content.parts[0].text;
-        document.getElementById('iaTexto').innerText = textoGerado;
-      } catch (error) {
-        console.error(error);
-        document.getElementById('iaTexto').innerText = "❌ Ocorreu um erro ao gerar a evolução: " + error.message;
-      }
-    };
-
     /* ================= BUSCA DE EVOLUÇÕES E PAGINAÇÃO ================= */
     window.buscarEvolucoes = function(pagina = 1) {
       const fPac = document.getElementById('buscaPaciente').value;
