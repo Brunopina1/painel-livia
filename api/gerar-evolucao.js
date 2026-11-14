@@ -1,16 +1,16 @@
-module.exports = async function handler(req, res) {
-  if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Método não permitido' });
-  }
-
-  const { prompt } = req.body || {};
-  const apiKey = process.env.GEMINI_API_KEY;
-
-  if (!apiKey) {
-    return res.status(500).json({ error: 'Chave GEMINI_API_KEY não configurada na Vercel.' });
-  }
-
+export async function POST(request) {
   try {
+    const body = await request.json();
+    const prompt = body.prompt;
+    const apiKey = process.env.GEMINI_API_KEY;
+
+    if (!apiKey) {
+      return Response.json(
+        { error: 'Chave GEMINI_API_KEY não encontrada nas variáveis da Vercel.' },
+        { status: 500 }
+      );
+    }
+
     const response = await fetch(
       'https://googleapis.com',
       {
@@ -28,11 +28,17 @@ module.exports = async function handler(req, res) {
     const data = await response.json();
 
     if (!response.ok) {
-      return res.status(response.status).json({ error: data.error?.message || 'Erro na API do Gemini' });
+      return Response.json(
+        { error: data.error?.message || `Erro HTTP ${response.status} no Google Gemini` },
+        { status: response.status }
+      );
     }
 
-    return res.status(200).json(data);
+    return Response.json(data, { status: 200 });
   } catch (error) {
-    return res.status(500).json({ error: error.message });
+    return Response.json(
+      { error: 'Falha interna na função: ' + error.message },
+      { status: 500 }
+    );
   }
-};
+}
