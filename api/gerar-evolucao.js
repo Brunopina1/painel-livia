@@ -2,30 +2,46 @@ export async function POST(request) {
   try {
     const body = await request.json();
     const prompt = body.prompt;
-    const apiKey = process.env.GEMINI_API_KEY;
+    const apiKey = (process.env.GEMINI_API_KEY || '').trim();
 
     if (!apiKey) {
       return Response.json(
-        { error: 'Chave GEMINI_API_KEY não encontrada nas variáveis da Vercel.' },
+        { error: 'Chave GEMINI_API_KEY não configurada na Vercel.' },
         { status: 500 }
       );
+    }
+
+    const headers = {
+      'Content-Type': 'application/json'
+    };
+
+    if (apiKey.startsWith('AQ.')) {
+      headers['Authorization'] = `Bearer ${apiKey}`;
+    } else {
+      headers['x-goog-api-key'] = apiKey;
     }
 
     const response = await fetch(
       'https://googleapis.com',
       {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          'x-goog-api-key': apiKey
-        },
+        headers,
         body: JSON.stringify({
           contents: [{ parts: [{ text: prompt }] }]
         })
       }
     );
 
-    const data = await response.json();
+    const textoBruto = await response.text();
+    let data;
+    try {
+      data = JSON.parse(textoBruto);
+    } catch {
+      return Response.json(
+        { error: `Resposta inválida do Google (HTTP ${response.status}): ${textoBruto.slice(0, 150)}` },
+        { status: 502 }
+      );
+    }
 
     if (!response.ok) {
       return Response.json(
