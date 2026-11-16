@@ -613,7 +613,7 @@
       "${textoOriginal}"`;
 
       try {
-        const response = await fetch('/api/gerar-evolucao', {
+        const response = await fetch('/api/gerar-evolucao', { ... });
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ prompt: promptSistema })
