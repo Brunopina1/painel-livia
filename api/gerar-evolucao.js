@@ -1,3 +1,47 @@
+import https from 'node:https';
+
+// Função auxiliar usando o módulo HTTPS nativo do Node.js (evita o erro "fetch failed" na Vercel)
+function fazerRequisicaoHTTPS(urlString, options = {}, bodyData = null) {
+  return new Promise((resolve, reject) => {
+    const url = new URL(urlString);
+    const reqOptions = {
+      hostname: url.hostname,
+      path: url.pathname + url.search,
+      method: options.method || 'GET',
+      headers: options.headers || {},
+      timeout: 25000 // 25 segundos de limite
+    };
+
+    const req = https.request(reqOptions, (res) => {
+      let data = '';
+      res.on('data', (chunk) => {
+        data += chunk;
+      });
+      res.on('end', () => {
+        resolve({
+          status: res.statusCode,
+          ok: res.statusCode >= 200 && res.statusCode < 300,
+          text: data
+        });
+      });
+    });
+
+    req.on('timeout', () => {
+      req.destroy();
+      reject(new Error('Tempo limite excedido ao conectar com o Google (Timeout).'));
+    });
+
+    req.on('error', (err) => {
+      reject(new Error(`Falha de rede HTTPS: ${err.message} (Código: ${err.code || 'N/A'})`));
+    });
+
+    if (bodyData) {
+      req.write(bodyData);
+    }
+    req.end();
+  });
+}
+
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Método não permitido. Use POST.' });
@@ -10,31 +54,34 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Nenhum texto foi enviado para a IA processar.' });
   }
 
-  // .trim() remove espaços ou quebras de linha acidentais ao colar a chave na Vercel
   const rawKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
   const apiKey = rawKey.trim();
 
   if (!apiKey) {
-    return res.status(500).json({ 
-      error: 'Chave da API não encontrada nas configurações da Vercel (GEMINI_API_KEY).' 
+    return res.status(500).json({
+      error: 'Chave da API não encontrada nas configurações da Vercel (GEMINI_API_KEY).'
     });
   }
 
   try {
-    // 1. Consulta os modelos passando a chave na URL (mais seguro contra bloqueio de headers)
-    const listaRes = await fetch(
-      `https://googleapis.com{encodeURIComponent(apiKey)}`,
-      { method: 'GET' }
+    // 1. Lista os modelos disponíveis na conta usando o cabeçalho oficial x-goog-api-key
+    const listaRes = await fazerRequisicaoHTTPS(
+      'https://googleapis.com',
+      {
+        method: 'GET',
+        headers: {
+          'x-goog-api-key': apiKey,
+          'Accept': 'application/json'
+        }
+      }
     );
 
-    const listaTexto = await listaRes.text();
     let listaData;
-
     try {
-      listaData = JSON.parse(listaTexto);
+      listaData = JSON.parse(listaRes.text);
     } catch (e) {
       return res.status(502).json({
-        error: `O Google retornou HTML em vez de JSON (Status ${listaRes.status}). Início do retorno: ${listaTexto.substring(0, 120)}`
+        error: `O Google retornou formato inválido (Status ${listaRes.status}): ${listaRes.text.substring(0, 120)}`
       });
     }
 
@@ -44,9 +91,9 @@ export default async function handler(req, res) {
       });
     }
 
-    // 2. Filtra apenas modelos que geram texto
+    // 2. Filtra apenas modelos de texto compatíveis com generateContent
     let modelosDisponiveis = (listaData.models || [])
-      .filter(m => 
+      .filter(m =>
         m.supportedGenerationMethods?.includes('generateContent') &&
         !m.name.includes('embedding') &&
         !m.name.includes('aqa') &&
@@ -55,7 +102,7 @@ export default async function handler(req, res) {
       )
       .map(m => m.name.replace('models/', ''));
 
-    // 3. Prioriza modelos "flash" mais recentes
+    // 3. Prioriza modelos da família "flash" mais recentes
     modelosDisponiveis.sort((a, b) => {
       const aFlash = a.includes('flash') ? 0 : 1;
       const bFlash = b.includes('flash') ? 0 : 1;
@@ -64,43 +111,50 @@ export default async function handler(req, res) {
     });
 
     if (modelosDisponiveis.length === 0) {
-      return res.status(500).json({ 
-        error: 'Nenhum modelo compatível com geração de texto foi encontrado nesta conta.' 
+      return res.status(500).json({
+        error: 'Nenhum modelo compatível com geração de texto foi encontrado nesta conta.'
       });
     }
 
-    // 4. Tenta gerar a evolução
+    // 4. Tenta gerar o texto clínico estruturado
     let ultimoErro = '';
+    const payload = JSON.stringify({
+      contents: [{ parts: [{ text: prompt }] }]
+    });
 
     for (const modelo of modelosDisponiveis) {
       try {
-        const url = `https://googleapis.com{modelo}:generateContent?key=${encodeURIComponent(apiKey)}`;
+        const url = `https://googleapis.com/${modelo}:generateContent`;
 
-        const response = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            contents: [{ parts: [{ text: prompt }] }]
-          })
-        });
+        const response = await fazerRequisicaoHTTPS(
+          url,
+          {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Content-Length': Buffer.byteLength(payload),
+              'x-goog-api-key': apiKey
+            }
+          },
+          payload
+        );
 
-        const respTexto = await response.text();
         let data;
-
         try {
-          data = JSON.parse(respTexto);
+          data = JSON.parse(response.text);
         } catch (e) {
-          ultimoErro = `HTTP ${response.status} (${modelo}) retornou HTML: ${respTexto.substring(0, 100)}`;
+          ultimoErro = `HTTP ${response.status} (${modelo}) retornou texto inválido.`;
           continue;
         }
 
-        if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
-          const respostaGerada = data.candidates[0].content.parts[0].text;
-          
+        const candidato = data.candidates && data.candidates[0];
+        const parte = candidato && candidato.content && candidato.content.parts && candidato.content.parts[0];
+
+        if (response.ok && parte && parte.text) {
           return res.status(200).json({
-            texto: respostaGerada,
-            evolucao: respostaGerada,
-            resultado: respostaGerada,
+            texto: parte.text,
+            evolucao: parte.text,
+            resultado: parte.text,
             modeloUtilizado: modelo
           });
         }
