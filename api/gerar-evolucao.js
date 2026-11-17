@@ -1,10 +1,8 @@
 export default async function handler(req, res) {
-  // Permite apenas requisições POST
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Método não permitido. Use POST.' });
   }
 
-  // Aceita diferentes nomes de campo enviados pelo painel.html
   const body = req.body || {};
   const prompt = body.prompt || body.texto || body.descricao || body.relato;
 
@@ -12,8 +10,9 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Nenhum texto foi enviado para a IA processar.' });
   }
 
-  // Busca a chave configurada nas variáveis de ambiente da Vercel
-  const apiKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY;
+  // .trim() remove espaços ou quebras de linha acidentais ao colar a chave na Vercel
+  const rawKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
+  const apiKey = rawKey.trim();
 
   if (!apiKey) {
     return res.status(500).json({ 
@@ -22,13 +21,22 @@ export default async function handler(req, res) {
   }
 
   try {
-    // 1. Consulta a API do Google para listar os modelos ativos na sua conta
-    const listaRes = await fetch('https://googleapis.com', {
-      method: 'GET',
-      headers: { 'x-goog-api-key': apiKey }
-    });
+    // 1. Consulta os modelos passando a chave na URL (mais seguro contra bloqueio de headers)
+    const listaRes = await fetch(
+      `https://googleapis.com{encodeURIComponent(apiKey)}`,
+      { method: 'GET' }
+    );
 
-    const listaData = await listaRes.json();
+    const listaTexto = await listaRes.text();
+    let listaData;
+
+    try {
+      listaData = JSON.parse(listaTexto);
+    } catch (e) {
+      return res.status(502).json({
+        error: `O Google retornou HTML em vez de JSON (Status ${listaRes.status}). Início do retorno: ${listaTexto.substring(0, 120)}`
+      });
+    }
 
     if (!listaRes.ok) {
       return res.status(listaRes.status).json({
@@ -36,7 +44,7 @@ export default async function handler(req, res) {
       });
     }
 
-    // 2. Filtra apenas modelos que geram texto (generateContent) e evita modelos experimentais pesados
+    // 2. Filtra apenas modelos que geram texto
     let modelosDisponiveis = (listaData.models || [])
       .filter(m => 
         m.supportedGenerationMethods?.includes('generateContent') &&
@@ -47,12 +55,12 @@ export default async function handler(req, res) {
       )
       .map(m => m.name.replace('models/', ''));
 
-    // 3. Ordena para priorizar os modelos da família "flash" (mais rápidos e ideais para texto)
+    // 3. Prioriza modelos "flash" mais recentes
     modelosDisponiveis.sort((a, b) => {
       const aFlash = a.includes('flash') ? 0 : 1;
       const bFlash = b.includes('flash') ? 0 : 1;
       if (aFlash !== bFlash) return aFlash - bFlash;
-      return b.localeCompare(a); // Coloca as versões numéricas mais novas primeiro
+      return b.localeCompare(a);
     });
 
     if (modelosDisponiveis.length === 0) {
@@ -61,30 +69,34 @@ export default async function handler(req, res) {
       });
     }
 
-    // 4. Tenta gerar a evolução usando os modelos descobertos (até encontrar o primeiro que aceite)
+    // 4. Tenta gerar a evolução
     let ultimoErro = '';
 
     for (const modelo of modelosDisponiveis) {
       try {
-        const url = `https://googleapis.com/${modelo}:generateContent`;
+        const url = `https://googleapis.com{modelo}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
         const response = await fetch(url, {
           method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'x-goog-api-key': apiKey
-          },
+          headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({
             contents: [{ parts: [{ text: prompt }] }]
           })
         });
 
-        const data = await response.json();
+        const respTexto = await response.text();
+        let data;
+
+        try {
+          data = JSON.parse(respTexto);
+        } catch (e) {
+          ultimoErro = `HTTP ${response.status} (${modelo}) retornou HTML: ${respTexto.substring(0, 100)}`;
+          continue;
+        }
 
         if (response.ok && data.candidates?.[0]?.content?.parts?.[0]?.text) {
           const respostaGerada = data.candidates[0].content.parts[0].text;
           
-          // Retorna múltiplos formatos de chave para garantir compatibilidade com seu painel.html
           return res.status(200).json({
             texto: respostaGerada,
             evolucao: respostaGerada,
