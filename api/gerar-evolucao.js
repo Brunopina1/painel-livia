@@ -30,7 +30,7 @@ function fazerRequisicaoHTTPS(hostname, path, headers, bodyData) {
     });
 
     req.on('error', (err) => {
-      reject(new Error(`Falha de rede HTTPS: ${err.message}`));
+      reject(new Error('Falha de rede HTTPS: ' + err.message));
     });
 
     if (bodyData) {
@@ -52,7 +52,6 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Nenhum texto foi enviado para a IA processar.' });
   }
 
-  // Remove espaços, quebras de linha ou aspas acidentais da chave salva na Vercel
   const rawKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
   const apiKey = rawKey.replace(/['"\s\r\n]+/g, '');
 
@@ -63,6 +62,11 @@ export default async function handler(req, res) {
   }
 
   const isChaveAQ = apiKey.startsWith('AQ.');
+
+  // Monta o domínio de forma blindada contra alterações de copy-paste
+  const dominioBase = ['googleapis', 'com'].join('.');
+  const subdominio = isChaveAQ ? 'aiplatform' : 'generativelanguage';
+  const hostname = subdominio + '.' + dominioBase;
 
   const modelos = [
     'gemini-2.5-flash',
@@ -80,10 +84,6 @@ export default async function handler(req, res) {
 
   for (const modelo of modelos) {
     try {
-      const hostname = isChaveAQ
-        ? '://googleapis.com'
-        : '://googleapis.com';
-
       const path = isChaveAQ
         ? '/v1/publishers/google/models/' + modelo + ':generateContent?key=' + encodeURIComponent(apiKey)
         : '/v1beta/models/' + modelo + ':generateContent?key=' + encodeURIComponent(apiKey);
@@ -102,7 +102,7 @@ export default async function handler(req, res) {
       try {
         data = JSON.parse(response.text);
       } catch (e) {
-        ultimoErro = `HTTP ${response.status} (${modelo}) retornou HTML em vez de JSON.`;
+        ultimoErro = 'HTTP ' + response.status + ' (' + modelo + ') retornou HTML em vez de JSON.';
         continue;
       }
 
@@ -118,13 +118,13 @@ export default async function handler(req, res) {
         });
       }
 
-      ultimoErro = `HTTP ${response.status} (${modelo}): ${data.error?.message || 'Erro desconhecido'}`;
+      ultimoErro = 'HTTP ' + response.status + ' (' + modelo + '): ' + (data.error?.message || 'Erro desconhecido');
     } catch (err) {
-      ultimoErro = `Falha na requisição (${modelo}): ${err.message}`;
+      ultimoErro = 'Falha na requisição (' + modelo + '): ' + err.message;
     }
   }
 
   return res.status(500).json({
-    error: `Nenhum modelo aceitou a requisição. Último retorno: ${ultimoErro}`
+    error: 'Nenhum modelo aceitou a requisição. Último retorno: ' + ultimoErro
   });
 }
