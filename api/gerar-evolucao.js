@@ -1,6 +1,5 @@
 import https from 'node:https';
 
-// Função auxiliar usando o módulo HTTPS nativo do Node.js (evita o erro "fetch failed" na Vercel)
 function fazerRequisicaoHTTPS(urlString, options = {}, bodyData = null) {
   return new Promise((resolve, reject) => {
     const url = new URL(urlString);
@@ -9,7 +8,7 @@ function fazerRequisicaoHTTPS(urlString, options = {}, bodyData = null) {
       path: url.pathname + url.search,
       method: options.method || 'GET',
       headers: options.headers || {},
-      timeout: 25000 // 25 segundos de limite
+      timeout: 25000
     };
 
     const req = https.request(reqOptions, (res) => {
@@ -32,7 +31,7 @@ function fazerRequisicaoHTTPS(urlString, options = {}, bodyData = null) {
     });
 
     req.on('error', (err) => {
-      reject(new Error(`Falha de rede HTTPS: ${err.message} (Código: ${err.code || 'N/A'})`));
+      reject(new Error(`Falha de rede HTTPS: ${err.message}`));
     });
 
     if (bodyData) {
@@ -63,115 +62,71 @@ export default async function handler(req, res) {
     });
   }
 
-  try {
-    // 1. Lista os modelos disponíveis na conta usando o cabeçalho oficial x-goog-api-key
-    const listaRes = await fazerRequisicaoHTTPS(
-      'https://googleapis.com',
-      {
-        method: 'GET',
-        headers: {
-          'x-goog-api-key': apiKey,
-          'Accept': 'application/json'
-        }
-      }
-    );
+  // Detecta automaticamente se a chave é do Vertex AI Express (AQ.) ou AI Studio (AIza)
+  const isChaveAQ = apiKey.startsWith('AQ.');
 
-    let listaData;
+  // Lista de modelos ativos para testar em ordem de prioridade
+  const modelos = [
+    'gemini-2.5-flash',
+    'gemini-2.5-flash-lite',
+    'gemini-2.0-flash',
+    'gemini-3.5-flash-lite',
+    'gemini-3.8-flash'
+  ];
+
+  const payload = JSON.stringify({
+    contents: [{ role: 'user', parts: [{ text: prompt }] }]
+  });
+
+  let ultimoErro = '';
+
+  for (const modelo of modelos) {
     try {
-      listaData = JSON.parse(listaRes.text);
-    } catch (e) {
-      return res.status(502).json({
-        error: `O Google retornou formato inválido (Status ${listaRes.status}): ${listaRes.text.substring(0, 120)}`
-      });
-    }
+      // Chaves AQ. usam o endpoint ://googleapis.com (Vertex AI Express)
+      // Chaves AIza usam o endpoint ://googleapis.com (AI Studio)
+      const url = isChaveAQ
+        ? `https://://googleapis.com/v1/publishers/google/models/${modelo}:generateContent?key=${encodeURIComponent(apiKey)}`
+        : `https://://googleapis.com/v1beta/models/${modelo}:generateContent?key=${encodeURIComponent(apiKey)}`;
 
-    if (!listaRes.ok) {
-      return res.status(listaRes.status).json({
-        error: `Erro ao consultar modelos no Google: ${listaData.error?.message || 'Status ' + listaRes.status}`
-      });
-    }
+      const response = await fazerRequisicaoHTTPS(
+        url,
+        {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+            'Content-Length': Buffer.byteLength(payload)
+          }
+        },
+        payload
+      );
 
-    // 2. Filtra apenas modelos de texto compatíveis com generateContent
-    let modelosDisponiveis = (listaData.models || [])
-      .filter(m =>
-        m.supportedGenerationMethods?.includes('generateContent') &&
-        !m.name.includes('embedding') &&
-        !m.name.includes('aqa') &&
-        !m.name.includes('imagen') &&
-        !m.name.includes('veo')
-      )
-      .map(m => m.name.replace('models/', ''));
-
-    // 3. Prioriza modelos da família "flash" mais recentes
-    modelosDisponiveis.sort((a, b) => {
-      const aFlash = a.includes('flash') ? 0 : 1;
-      const bFlash = b.includes('flash') ? 0 : 1;
-      if (aFlash !== bFlash) return aFlash - bFlash;
-      return b.localeCompare(a);
-    });
-
-    if (modelosDisponiveis.length === 0) {
-      return res.status(500).json({
-        error: 'Nenhum modelo compatível com geração de texto foi encontrado nesta conta.'
-      });
-    }
-
-    // 4. Tenta gerar o texto clínico estruturado
-    let ultimoErro = '';
-    const payload = JSON.stringify({
-      contents: [{ parts: [{ text: prompt }] }]
-    });
-
-    for (const modelo of modelosDisponiveis) {
+      let data;
       try {
-        const url = `https://googleapis.com/${modelo}:generateContent`;
-
-        const response = await fazerRequisicaoHTTPS(
-          url,
-          {
-            method: 'POST',
-            headers: {
-              'Content-Type': 'application/json',
-              'Content-Length': Buffer.byteLength(payload),
-              'x-goog-api-key': apiKey
-            }
-          },
-          payload
-        );
-
-        let data;
-        try {
-          data = JSON.parse(response.text);
-        } catch (e) {
-          ultimoErro = `HTTP ${response.status} (${modelo}) retornou texto inválido.`;
-          continue;
-        }
-
-        const candidato = data.candidates && data.candidates[0];
-        const parte = candidato && candidato.content && candidato.content.parts && candidato.content.parts[0];
-
-        if (response.ok && parte && parte.text) {
-          return res.status(200).json({
-            texto: parte.text,
-            evolucao: parte.text,
-            resultado: parte.text,
-            modeloUtilizado: modelo
-          });
-        }
-
-        ultimoErro = `HTTP ${response.status} no modelo ${modelo}: ${data.error?.message || 'Erro desconhecido'}`;
-      } catch (err) {
-        ultimoErro = `Falha na requisição (${modelo}): ${err.message}`;
+        data = JSON.parse(response.text);
+      } catch (e) {
+        ultimoErro = `HTTP ${response.status} (${modelo}) retornou HTML em vez de JSON.`;
+        continue;
       }
+
+      const candidato = data.candidates && data.candidates;
+      const parte = candidato && candidato.content && candidato.content.parts && candidato.content.parts;
+
+      if (response.ok && parte && parte.text) {
+        return res.status(200).json({
+          texto: parte.text,
+          evolucao: parte.text,
+          resultado: parte.text,
+          modeloUtilizado: modelo
+        });
+      }
+
+      ultimoErro = `HTTP ${response.status} (${modelo}): ${data.error?.message || 'Erro desconhecido'}`;
+    } catch (err) {
+      ultimoErro = `Falha na requisição (${modelo}): ${err.message}`;
     }
-
-    return res.status(500).json({
-      error: `Nenhum modelo aceitou a requisição. Último retorno: ${ultimoErro}`
-    });
-
-  } catch (error) {
-    return res.status(500).json({
-      error: `Erro interno no servidor da Vercel: ${error.message}`
-    });
   }
+
+  return res.status(500).json({
+    error: `Nenhum modelo aceitou a requisição. Último retorno: ${ultimoErro}`
+  });
 }
