@@ -1,13 +1,12 @@
 import https from 'node:https';
 
-function fazerRequisicaoHTTPS(urlString, options = {}, bodyData = null) {
+function fazerRequisicaoHTTPS(hostname, path, headers, bodyData) {
   return new Promise((resolve, reject) => {
-    const url = new URL(urlString);
     const reqOptions = {
-      hostname: url.hostname,
-      path: url.pathname + url.search,
-      method: options.method || 'GET',
-      headers: options.headers || {},
+      hostname: hostname,
+      path: path,
+      method: 'POST',
+      headers: headers,
       timeout: 25000
     };
 
@@ -27,7 +26,7 @@ function fazerRequisicaoHTTPS(urlString, options = {}, bodyData = null) {
 
     req.on('timeout', () => {
       req.destroy();
-      reject(new Error('Tempo limite excedido ao conectar com o Google (Timeout).'));
+      reject(new Error('Tempo limite excedido ao conectar com o Google.'));
     });
 
     req.on('error', (err) => {
@@ -53,8 +52,9 @@ export default async function handler(req, res) {
     return res.status(400).json({ error: 'Nenhum texto foi enviado para a IA processar.' });
   }
 
+  // Remove espaços, quebras de linha ou aspas acidentais da chave salva na Vercel
   const rawKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
-  const apiKey = rawKey.trim();
+  const apiKey = rawKey.replace(/['"\s\r\n]+/g, '');
 
   if (!apiKey) {
     return res.status(500).json({
@@ -62,10 +62,8 @@ export default async function handler(req, res) {
     });
   }
 
-  // Detecta automaticamente se a chave é do Vertex AI Express (AQ.) ou AI Studio (AIza)
   const isChaveAQ = apiKey.startsWith('AQ.');
 
-  // Lista de modelos ativos para testar em ordem de prioridade
   const modelos = [
     'gemini-2.5-flash',
     'gemini-2.5-flash-lite',
@@ -82,20 +80,20 @@ export default async function handler(req, res) {
 
   for (const modelo of modelos) {
     try {
-      // Chaves AQ. usam o endpoint ://googleapis.com (Vertex AI Express)
-      // Chaves AIza usam o endpoint ://googleapis.com (AI Studio)
-      const url = isChaveAQ
-        ? `https://://googleapis.com/v1/publishers/google/models/${modelo}:generateContent?key=${encodeURIComponent(apiKey)}`
-        : `https://://googleapis.com/v1beta/models/${modelo}:generateContent?key=${encodeURIComponent(apiKey)}`;
+      const hostname = isChaveAQ
+        ? '://googleapis.com'
+        : '://googleapis.com';
+
+      const path = isChaveAQ
+        ? '/v1/publishers/google/models/' + modelo + ':generateContent?key=' + encodeURIComponent(apiKey)
+        : '/v1beta/models/' + modelo + ':generateContent?key=' + encodeURIComponent(apiKey);
 
       const response = await fazerRequisicaoHTTPS(
-        url,
+        hostname,
+        path,
         {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-            'Content-Length': Buffer.byteLength(payload)
-          }
+          'Content-Type': 'application/json',
+          'Content-Length': Buffer.byteLength(payload)
         },
         payload
       );
