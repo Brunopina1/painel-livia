@@ -65,7 +65,7 @@
   .btn-perigo:hover { background: var(--perigo); color: white; }
   .btn-editar { background: transparent; border: 1px solid var(--alerta); color: #b5801f; }
   .btn-editar:hover { background: var(--alerta); color: white; }
-
+  
   .table-container { overflow-x: auto; }
   table { width: 100%; border-collapse: collapse; margin-top: 10px; }
   th, td { padding: 15px; text-align: left; border-bottom: 1px solid #eee; }
@@ -154,12 +154,12 @@
         <div class="card">
           <h3 id="tituloFormPaciente">Cadastrar Novo Paciente</h3>
           <input type="hidden" id="pIdEdicao" value="">
-
+          
           <div class="row">
             <div class="form-group"><label>Nome Completo da Criança</label><input type="text" id="pNome" class="form-control" placeholder="Ex: João Silva"></div>
             <div class="form-group"><label>Data de Nascimento</label><input type="text" id="pNasc" class="form-control" placeholder="Clique para abrir o calendário"><small id="infoIdade" style="color: var(--verde-salvia); font-weight: 600; display: none; margin-top: 5px;"></small></div>
           </div>
-
+          
           <div class="row" style="margin-bottom: 15px;">
             <div class="form-group"><label>CPF do Paciente (opcional)</label><input type="text" id="pCpf" class="form-control" placeholder="000.000.000-00"></div>
             <div class="form-group"><label>Nome do Responsável</label><input type="text" id="pResp" class="form-control" placeholder="Ex: Maria Silva"></div>
@@ -174,7 +174,7 @@
             <label>Observações Iniciais (opcional)</label>
             <input type="text" id="pObs" class="form-control" placeholder="Ex: Encaminhado por...">
           </div>
-
+          
           <button class="btn" onclick="salvarPaciente()" id="btnSalvarPaciente">Salvar Cadastro</button>
           <button class="btn btn-outline" onclick="cancelarEdicaoPaciente()" id="btnCancelarPaciente" style="display:none;">Cancelar Edição</button>
         </div>
@@ -236,7 +236,7 @@
             <div id="iaTexto" class="ia-texto"></div>
           </div>
         </div>
-
+        
         <div class="card">
           <h3>Buscar Atendimentos para Editar/Excluir</h3>
           <div class="row-4" style="margin-bottom: 15px;">
@@ -249,7 +249,7 @@
             <button class="btn" onclick="buscarEvolucoes(1)">🔍 Pesquisar</button>
             <button class="btn btn-outline" onclick="limparBuscaEvolucoes()">Limpar</button>
           </div>
-
+          
           <div style="margin-top: 20px;">
             <div class="contador-box" id="contadorBusca">Clique em pesquisar para carregar os atendimentos.</div>
             <div class="table-container">
@@ -283,15 +283,15 @@
             <button class="btn btn-outline" onclick="window.print()">🖨️ Imprimir / PDF</button>
           </div>
         </div>
-
+        
         <div class="card">
           <div class="contador-box" id="contadorRelatorio" style="margin-bottom: 10px;">Nenhum atendimento buscado</div>
-
+          
           <div class="header-relatorio-container">
             <img src="logo.png" alt="Logo Livia Caroline">
             <div class="header-titulo"><h2>Relatório de Atendimentos</h2><p>Terapia Ocupacional & Integração Sensorial</p></div>
           </div>
-
+          
           <div class="table-container">
             <table>
               <thead><tr><th style="width: 15%;">Data</th><th style="width: 25%;">Paciente</th><th style="width: 60%;">Evolução do Atendimento</th></tr></thead>
@@ -307,7 +307,7 @@
     import { initializeApp } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-app.js";
     import { getAuth, signInWithEmailAndPassword, signOut, onAuthStateChanged } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-auth.js";
     import { getFirestore, collection, addDoc, getDocs, doc, updateDoc, deleteDoc, query } from "https://www.gstatic.com/firebasejs/10.8.0/firebase-firestore.js";
-
+    
     const scriptFlatpickr = document.createElement('script');
     scriptFlatpickr.src = "https://cdn.jsdelivr.net/npm/flatpickr";
     document.head.appendChild(scriptFlatpickr);
@@ -334,7 +334,7 @@
     let agendaGlobal = [];
     let evolucoesGlobal = [];
     let configCalendario = {};
-
+    
     let resultadosBuscaEvolucao = [];
     let paginaAtualEvolucao = 1;
     const ITENS_POR_PAGINA = 20;
@@ -343,9 +343,9 @@
       const email = document.getElementById('emailInput').value;
       const senha = document.getElementById('senhaInput').value;
       const erroP = document.getElementById('erroLogin');
-
+      
       if(!email || !senha) { erroP.innerText = "Preencha e-mail e senha."; erroP.style.display = 'block'; return; }
-
+      
       try {
         await signInWithEmailAndPassword(auth, email, senha);
         erroP.style.display = 'none';
@@ -377,7 +377,7 @@
           if (instance.element.id === 'pNasc') calcularIdadeCadastro();
         }
       };
-
+      
       setTimeout(() => {
         flatpickr("#pNasc", { ...configCalendario, maxDate: "today" });
         flatpickr("#eData", { ...configCalendario, maxDate: null });
@@ -470,11 +470,11 @@
       document.getElementById('pCpfResp').value = p.cpfResp || '';
       document.getElementById('pTel').value = p.tel || '';
       document.getElementById('pObs').value = p.obs || '';
-
+      
       document.getElementById('tituloFormPaciente').innerText = "Editar Cadastro de Paciente";
       document.getElementById('btnSalvarPaciente').innerText = "Atualizar Cadastro";
       document.getElementById('btnCancelarPaciente').style.display = "inline-block";
-
+      
       window.calcularIdadeCadastro();
       window.scrollTo({ top: 0, behavior: 'smooth' });
     };
@@ -547,9 +547,9 @@
         window.cancelarEdicaoEvolucao();
         alert('Evolução salva com sucesso!');
         await carregarDados();
-
+        
         if(resultadosBuscaEvolucao.length > 0) buscarEvolucoes(paginaAtualEvolucao);
-
+        
       } catch(e) { alert("Erro: " + e.message); }
     };
 
@@ -561,10 +561,10 @@
       document.getElementById('eData').value = e.data;
       if (document.getElementById('eData')._flatpickr) document.getElementById('eData')._flatpickr.setDate(e.data, false);
       document.getElementById('eDescricao').value = e.descricao;
-
+      
       document.getElementById('iaTexto').innerText = e.descricaoIA || "Clique em 'Estruturar com IA' para gerar o texto.";
       document.getElementById('iaResultado').classList.add('visivel');
-
+      
       document.getElementById('tituloFormEvolucao').innerText = "Editar Evolução de Atendimento";
       document.getElementById('btnSalvarEvolucao').innerText = "Atualizar Evolução";
       document.getElementById('btnCancelarEvolucao').style.display = "inline-block";
@@ -614,7 +614,6 @@
 
       try {
         const response = await fetch('/api/gerar-evolucao', {
-        const response = await fetch('/api/gerar-evolucao', { ... });
           method: 'POST',
           headers: { 'Content-Type': 'application/json' },
           body: JSON.stringify({ prompt: promptSistema })
@@ -646,7 +645,7 @@
       let evolucoes = [...evolucoesGlobal];
 
       if (fPac) { evolucoes = evolucoes.filter(e => e.pacienteId === fPac); }
-
+      
       const parseDate = (d) => {
         if(!d) return null;
         const p = d.split('/');
@@ -665,17 +664,17 @@
       }
 
       evolucoes.sort((a,b) => parseDate(b.data) - parseDate(a.data));
-
+      
       resultadosBuscaEvolucao = evolucoes;
       paginaAtualEvolucao = pagina;
-
+      
       renderizarPaginaEvolucao();
     };
 
     function renderizarPaginaEvolucao() {
       const totalItens = resultadosBuscaEvolucao.length;
       const totalPaginas = Math.ceil(totalItens / ITENS_POR_PAGINA);
-
+      
       const inicio = (paginaAtualEvolucao - 1) * ITENS_POR_PAGINA;
       const fim = inicio + ITENS_POR_PAGINA;
       const itensPagina = resultadosBuscaEvolucao.slice(inicio, fim);
@@ -694,7 +693,7 @@
           </td>
         </tr>
       `).join('') || '<tr><td colspan="5" style="text-align: center; color: #888;">Nenhum atendimento encontrado com esses filtros.</td></tr>';
-
+      
       const pagDiv = document.getElementById('paginacaoEvolucoes');
       if (totalPaginas > 1) {
         pagDiv.style.display = 'flex';
@@ -716,7 +715,7 @@
       if(document.getElementById('buscaData')._flatpickr) document.getElementById('buscaData')._flatpickr.clear();
       if(document.getElementById('buscaDataIni')._flatpickr) document.getElementById('buscaDataIni')._flatpickr.clear();
       if(document.getElementById('buscaDataFim')._flatpickr) document.getElementById('buscaDataFim')._flatpickr.clear();
-
+      
       resultadosBuscaEvolucao = [];
       document.getElementById('listaEvolucao').innerHTML = '';
       document.getElementById('contadorBusca').innerText = "Clique em pesquisar para carregar os atendimentos.";
@@ -726,11 +725,11 @@
     function carregarSelects() {
       let options = '<option value="">Selecione um paciente</option>';
       pacientesGlobal.forEach(p => { options += `<option value="${p.id}">${p.nome}</option>`; });
-
+      
       document.getElementById('aPaciente').innerHTML = options;
       document.getElementById('ePaciente').innerHTML = options;
       document.getElementById('buscaPaciente').innerHTML = '<option value="">Todos os Pacientes</option>' + options;
-
+      
       let filtroOptions = '<option value="">Todos os Pacientes</option>';
       pacientesGlobal.forEach(p => { filtroOptions += `<option value="${p.id}">${p.nome}</option>`; });
       document.getElementById('fPaciente').innerHTML = filtroOptions;
@@ -771,7 +770,7 @@
 
     window.filtrarRelatorio = function() {
       let evolucoes = [...evolucoesGlobal];
-
+      
       const fPac = document.getElementById('fPaciente').value;
       const fDataExata = document.getElementById('fData').value;
       const fDataIni = document.getElementById('fDataInicio').value;
@@ -785,7 +784,7 @@
       }
 
       if (fPac) { evolucoes = evolucoes.filter(e => e.pacienteId === fPac); }
-
+      
       const parseDate = (d) => {
         if(!d) return null;
         const p = d.split('/');
@@ -825,7 +824,7 @@
       if(document.getElementById('fData')._flatpickr) document.getElementById('fData')._flatpickr.clear();
       if(document.getElementById('fDataInicio')._flatpickr) document.getElementById('fDataInicio')._flatpickr.clear();
       if(document.getElementById('fDataFim')._flatpickr) document.getElementById('fDataFim')._flatpickr.clear();
-
+      
       document.getElementById('contadorRelatorio').innerText = "Aplique um filtro acima para buscar";
       document.getElementById('listaRelatorios').innerHTML = '';
     };
