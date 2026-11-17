@@ -414,6 +414,8 @@
       elementoMenu.classList.add('ativo');
       const titulos = { 'pacientes': 'Gestão de Pacientes', 'agenda': 'Agenda de Horários', 'evolucao': 'Evolução de Atendimento', 'relatorios': 'Relatórios e Prontuários' };
       document.getElementById('tituloTela').innerText = titulos[idTela];
+      
+      if(idTela === 'evolucao') { carregarSelects(); }
     };
 
     window.calcularIdade = function(dataStr) {
