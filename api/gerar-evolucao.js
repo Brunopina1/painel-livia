@@ -1,130 +1,48 @@
-import https from 'node:https';
-
-function fazerRequisicaoHTTPS(hostname, path, headers, bodyData) {
-  return new Promise((resolve, reject) => {
-    const reqOptions = {
-      hostname: hostname,
-      path: path,
-      method: 'POST',
-      headers: headers,
-      timeout: 25000
-    };
-
-    const req = https.request(reqOptions, (res) => {
-      let data = '';
-      res.on('data', (chunk) => {
-        data += chunk;
-      });
-      res.on('end', () => {
-        resolve({
-          status: res.statusCode,
-          ok: res.statusCode >= 200 && res.statusCode < 300,
-          text: data
-        });
-      });
-    });
-
-    req.on('timeout', () => {
-      req.destroy();
-      reject(new Error('Tempo limite excedido ao conectar com o Google.'));
-    });
-
-    req.on('error', (err) => {
-      reject(new Error('Falha de rede HTTPS: ' + err.message));
-    });
-
-    if (bodyData) {
-      req.write(bodyData);
-    }
-    req.end();
-  });
-}
-
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
-    return res.status(405).json({ error: 'Método não permitido. Use POST.' });
+    return res.status(405).json({ error: 'Método não permitido' });
   }
 
-  const body = req.body || {};
-  const prompt = body.prompt || body.texto || body.descricao || body.relato;
-
-  if (!prompt) {
-    return res.status(400).json({ error: 'Nenhum texto foi enviado para a IA processar.' });
-  }
-
-  const rawKey = process.env.GEMINI_API_KEY || process.env.GOOGLE_API_KEY || '';
-  const apiKey = rawKey.replace(/['"\s\r\n]+/g, '');
+  const { prompt } = req.body;
+  const apiKey = process.env.GROQ_API_KEY;
 
   if (!apiKey) {
-    return res.status(500).json({
-      error: 'Chave da API não encontrada nas configurações da Vercel (GEMINI_API_KEY).'
+    return res.status(500).json({ error: 'Chave da API da Groq não configurada na Vercel.' });
+  }
+
+  try {
+    // A Groq usa o formato compatível com OpenAI
+    const response = await fetch('https://api.groq.com/openai/v1/chat/completions', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'Authorization': `Bearer ${apiKey}`
+      },
+      body: JSON.stringify({
+        model: 'llama-3.3-70b-versatile', // Modelo rápido e gratuito
+        messages: [
+          { role: 'system', content: 'Você é um assistente especialista em Terapia Ocupacional.' },
+          { role: 'user', content: prompt }
+        ],
+        temperature: 0.7
+      })
     });
-  }
 
-  const isChaveAQ = apiKey.startsWith('AQ.');
+    const data = await response.json();
 
-  // Monta o domínio de forma blindada contra alterações de copy-paste
-  const dominioBase = ['googleapis', 'com'].join('.');
-  const subdominio = isChaveAQ ? 'aiplatform' : 'generativelanguage';
-  const hostname = subdominio + '.' + dominioBase;
-
-  const modelos = [
-    'gemini-2.5-flash',
-    'gemini-2.5-flash-lite',
-    'gemini-2.0-flash',
-    'gemini-3.5-flash-lite',
-    'gemini-3.8-flash'
-  ];
-
-  const payload = JSON.stringify({
-    contents: [{ role: 'user', parts: [{ text: prompt }] }]
-  });
-
-  let ultimoErro = '';
-
-  for (const modelo of modelos) {
-    try {
-      const path = isChaveAQ
-        ? '/v1/publishers/google/models/' + modelo + ':generateContent?key=' + encodeURIComponent(apiKey)
-        : '/v1beta/models/' + modelo + ':generateContent?key=' + encodeURIComponent(apiKey);
-
-      const response = await fazerRequisicaoHTTPS(
-        hostname,
-        path,
-        {
-          'Content-Type': 'application/json',
-          'Content-Length': Buffer.byteLength(payload)
-        },
-        payload
-      );
-
-      let data;
-      try {
-        data = JSON.parse(response.text);
-      } catch (e) {
-        ultimoErro = 'HTTP ' + response.status + ' (' + modelo + ') retornou HTML em vez de JSON.';
-        continue;
-      }
-
-      const candidato = data.candidates && data.candidates;
-      const parte = candidato && candidato.content && candidato.content.parts && candidato.content.parts;
-
-      if (response.ok && parte && parte.text) {
-        return res.status(200).json({
-          texto: parte.text,
-          evolucao: parte.text,
-          resultado: parte.text,
-          modeloUtilizado: modelo
-        });
-      }
-
-      ultimoErro = 'HTTP ' + response.status + ' (' + modelo + '): ' + (data.error?.message || 'Erro desconhecido');
-    } catch (err) {
-      ultimoErro = 'Falha na requisição (' + modelo + '): ' + err.message;
+    if (!response.ok) {
+      return res.status(response.status).json({ error: data.error?.message || 'Erro na API da Groq' });
     }
-  }
 
-  return res.status(500).json({
-    error: 'Nenhum modelo aceitou a requisição. Último retorno: ' + ultimoErro
-  });
+    // A resposta da Groq vem no formato choices[0].message.content
+    const textoGerado = data.choices[0].message.content;
+    
+    // Retornamos no mesmo formato que o painel espera (candidates...)
+    return res.status(200).json({ 
+      candidates: [{ content: { parts: [{ text: textoGerado }] } }] 
+    });
+
+  } catch (error) {
+    return res.status(500).json({ error: error.message });
+  }
 }
