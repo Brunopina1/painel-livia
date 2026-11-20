@@ -20,7 +20,10 @@ export default async function handler(req, res) {
       body: JSON.stringify({
         model: 'openai/gpt-oss-120b',
         messages: [
-          { role: 'system', content: 'Você é um Diretor Clínico e Terapeuta Ocupacional Sênior, especialista em supervisão de casos clínicos, gestão de qualidade terapêutica e raciocínio clínico baseado em evidências.' },
+          { 
+            role: 'system', 
+            content: 'Você é um Diretor Clínico e Terapeuta Ocupacional Sênior, especialista em supervisão de casos clínicos, gestão de qualidade terapêutica e raciocínio clínico baseado em evidências. Sua análise deve ser estritamente técnica, ética e focada na prática clínica. Evite elogios vazios ou superlativos. Reconheça apenas as condutas técnicas que estão funcionando bem, justificando o porquê. Seja direto, claro e objetivo.' 
+          },
           { role: 'user', content: prompt }
         ],
         temperature: 0.2
