@@ -19,12 +19,12 @@ export default async function handler(req, res) {
         'Authorization': `Bearer ${apiKey}`
       },
       body: JSON.stringify({
-        model: 'llama-3.3-70b-versatile', // Modelo rápido e gratuito
+        model: 'openai/gpt-oss-120b', // Modelo que substituiu o Llama 3.3 descontinuado [citation:2][citation:7]
         messages: [
           { role: 'system', content: 'Você é um assistente especialista em Terapia Ocupacional.' },
           { role: 'user', content: prompt }
         ],
-        temperature: 0.7
+        temperature: 0.2 // Valor baixo para o texto ficar mais fiel ao prompt e menos "criativo"
       })
     });
 
